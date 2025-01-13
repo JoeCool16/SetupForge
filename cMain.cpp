@@ -17,8 +17,8 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     wxArrayString choices;
     choices.Add("Run an Exe");
     choices.Add("Move File");
-    choices.Add("Option 3");
-    choices.Add("Option 4");
+    choices.Add("Create Folder");
+    choices.Add("Create File");
     choices.Add("Option 5");
     m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
     vbox->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);  // Center horizontally, 10px from the top
@@ -115,6 +115,64 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             }
         }
     }
+    else if (selectedOption == "Create Folder")
+    {
+        // Step 1: Select the base folder path
+        wxDirDialog folderDialog(
+            this,
+            "Select the base folder where the new folder will be created:",
+            "",
+            wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+
+        if (folderDialog.ShowModal() == wxID_OK)
+        {
+            wxString basePath = folderDialog.GetPath(); // Get the base folder path
+
+            // Step 2: Ask for the new folder name
+            wxTextEntryDialog nameDialog(
+                this,
+                "Enter the name of the new folder:",
+                "New Folder Name",
+                "",
+                wxOK | wxCANCEL);
+
+            if (nameDialog.ShowModal() == wxID_OK)
+            {
+                wxString folderName = nameDialog.GetValue().Trim(); // Get the folder name
+
+                // Ensure the folder name is valid
+                if (!folderName.IsEmpty())
+                {
+                    // Construct the full folder path
+                    wxString fullFolderPath = basePath + "\\" + folderName;
+
+                    // Add to the list box
+                    m_listBox->AppendString("Create Folder: " + fullFolderPath);
+                }
+                else
+                {
+                    wxMessageBox("Folder name cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                }
+            }
+        }
+    }
+    else if (selectedOption == "Create File")
+    {
+        // Dialog for specifying the file name and path
+        wxFileDialog fileDialog(
+            this,
+            "Select a file to create:",
+            "",
+            "",
+            "All files (*.*)|*.*",
+            wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+        if (fileDialog.ShowModal() == wxID_OK)
+        {
+            wxString filePath = fileDialog.GetPath();
+            m_listBox->AppendString("Create File: " + filePath);
+        }
+    }
     else
     {
         // For other options, just add the option name to the list box
@@ -180,6 +238,16 @@ void cMain::OnSaveScriptClicked(wxCommandEvent& evt)
         {
             wxString moveCommand = item.Mid(6).Trim();  // Extract the move command after "Move: "
             scriptFile << "move " << moveCommand.ToStdString() << std::endl;
+        }
+        else if (item.StartsWith("Create Folder: "))
+        {
+            wxString folderPath = item.Mid(15).Trim();  // Extract folder path
+            scriptFile << "mkdir \"" << folderPath.ToStdString() << "\"" << std::endl;
+        }
+        else if (item.StartsWith("Create File: "))
+        {
+            wxString filePath = item.Mid(13).Trim();  // Extract file path
+            scriptFile << "type nul > \"" << filePath.ToStdString() << "\"" << std::endl;
         }
     }
 

@@ -1,7 +1,12 @@
 #include "cMain.h"
+#include <wx/stdpaths.h>
+#include <wx/filefn.h>
+#include <wx/filename.h>
+#include <fstream>
 
 wxBEGIN_EVENT_TABLE(cMain, wxFrame)
 	EVT_BUTTON(1001, OnButtonClicked)
+    EVT_BUTTON(1002, OnSaveScriptClicked)
 wxEND_EVENT_TABLE()
 
 cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSize(800, 600))
@@ -28,6 +33,10 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     // Middle box (wxListBox) to display selected options
     m_listBox = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(300, 300));
     vbox->Add(m_listBox, 1, wxALIGN_CENTER | wxALL, 10);  // Expandable and centered
+
+    // Save Script Button
+    m_btnSave = new wxButton(this, 1002, "Save Script", wxDefaultPosition, wxSize(100, 30));
+    vbox->Add(m_btnSave, 0, wxALIGN_CENTER | wxTOP, 10);  // Place button below the list box
 
     // Set the sizer for the frame
     this->SetSizer(vbox);
@@ -62,7 +71,7 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             m_selectedFilePath = filePath;
 
             // Add the file path to the list box
-            m_listBox->AppendString("Selected .exe: " + filePath);
+            m_listBox->AppendString("Run .exe: " + filePath);
         }
     }
     else
@@ -75,4 +84,47 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
     }
 
     evt.Skip();
+}
+
+void cMain::OnSaveScriptClicked(wxCommandEvent& evt)
+{
+    // Get the standard paths to create the results folder
+    wxString resultsPath = wxStandardPaths::Get().GetExecutablePath();
+    wxFileName exePath(resultsPath);
+    wxString resultsDir = exePath.GetPath() + "\\results\\";
+
+    // Create the results folder if it doesn't exist
+    if (!wxDirExists(resultsDir))
+    {
+        wxMkdir(resultsDir);
+    }
+
+    // Script file path
+    wxString scriptPath = resultsDir + "run_script.bat";
+
+    // Open file for writing
+    std::ofstream scriptFile(scriptPath.ToStdString());
+    if (!scriptFile.is_open())
+    {
+        wxMessageBox("Failed to create the script file!", "Error", wxOK | wxICON_ERROR);
+        return;
+    }
+
+    // Write each item in the list box to the script file
+    for (unsigned int i = 0; i < m_listBox->GetCount(); i++)
+    {
+        wxString item = m_listBox->GetString(i);
+
+        // Check if the item starts with "Run .exe: " and extract the path
+        if (item.StartsWith("Run .exe: "))
+        {
+            wxString exePath = item.Mid(10);  // Extract the path after "Run .exe: "
+            scriptFile << "\"" << exePath.ToStdString() << "\"" << std::endl;
+        }
+    }
+
+    scriptFile.close();
+
+    // Inform the user that the script has been saved
+    wxMessageBox("Script saved to: " + scriptPath, "Success", wxOK | wxICON_INFORMATION);
 }

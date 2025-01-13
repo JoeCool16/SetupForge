@@ -16,9 +16,11 @@ public:
 	wxChoice* m_choice = nullptr;     // Dropdown menu
 	wxButton* m_btnAdd = nullptr;     // "+" Button
 	wxListBox* m_listBox = nullptr;   // Middle box for displaying options
+	wxButton* m_btnSave = nullptr;
 	wxString m_selectedFilePath;
 
 	void OnButtonClicked(wxCommandEvent& evt);
+	void OnSaveScriptClicked(wxCommandEvent& evt);
 
 	wxDECLARE_EVENT_TABLE();
 };

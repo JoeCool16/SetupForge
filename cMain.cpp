@@ -16,7 +16,7 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     // Dropdown (wxChoice) to select options
     wxArrayString choices;
     choices.Add("Run an Exe");
-    choices.Add("Option 2");
+    choices.Add("Move File");
     choices.Add("Option 3");
     choices.Add("Option 4");
     choices.Add("Option 5");
@@ -84,6 +84,37 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             m_listBox->AppendString("Run .exe: " + filePath);
         }
     }
+    else if (selectedOption == "Move File")
+    {
+        // File dialog for selecting the source file
+        wxFileDialog sourceFileDialog(
+            this,
+            "Select the file to move",
+            "",
+            "",
+            "All files (*.*)|*.*",
+            wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+        if (sourceFileDialog.ShowModal() == wxID_OK)
+        {
+            wxString sourcePath = sourceFileDialog.GetPath();
+
+            // File dialog for selecting the destination folder
+            wxDirDialog destinationDirDialog(
+                this,
+                "Select the destination folder",
+                "",
+                wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+
+            if (destinationDirDialog.ShowModal() == wxID_OK)
+            {
+                wxString destinationPath = destinationDirDialog.GetPath();
+
+                // Append the move command to the list box
+                m_listBox->AppendString("Move: \"" + sourcePath + "\" \"" + destinationPath + "\"");
+            }
+        }
+    }
     else
     {
         // For other options, just add the option name to the list box
@@ -144,6 +175,11 @@ void cMain::OnSaveScriptClicked(wxCommandEvent& evt)
         {
             wxString exePath = item.Mid(10);  // Extract the path after "Run .exe: "
             scriptFile << "\"" << exePath.ToStdString() << "\"" << std::endl;
+        }
+        else if (item.StartsWith("Move: "))
+        {
+            wxString moveCommand = item.Mid(6).Trim();  // Extract the move command after "Move: "
+            scriptFile << "move " << moveCommand.ToStdString() << std::endl;
         }
     }
 

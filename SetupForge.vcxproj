@@ -112,12 +112,12 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(WXWIN)\include; $(WXWIN)\include\msvc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\wxWidgets\include\msvc;$(WXWIN)\include;C:\wxWidgets\include;$(WXWIN)\include\msvc</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(WXWIN)\lib\vc_x64_lib</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\wxWidgets\lib\vc_x64_lib;$(WXWIN)\lib\vc_x64_lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

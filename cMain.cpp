@@ -19,7 +19,7 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     choices.Add("Move File");
     choices.Add("Create Folder");
     choices.Add("Create File");
-    choices.Add("Option 5");
+    choices.Add("Add/Edit Environment Variables");
     m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
     vbox->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);  // Center horizontally, 10px from the top
 
@@ -173,6 +173,119 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             m_listBox->AppendString("Create File: " + filePath);
         }
     }
+    else if (selectedOption == "Add/Edit Environment Variables")
+    {
+        // Step 1: Input the name of the environment variable
+        wxTextEntryDialog varNameDialog(
+            this,
+            "Enter the name of the environment variable (e.g., PATH):",
+            "Add/Edit Environment Variable",
+            "",
+            wxOK | wxCANCEL);
+
+        if (varNameDialog.ShowModal() == wxID_OK)
+        {
+            wxString varName = varNameDialog.GetValue().Trim();
+
+            // Ensure the variable name is valid
+            if (!varName.IsEmpty())
+            {
+                // Check if the variable exists (user-level)
+                wxString currentValue;
+                if (wxGetEnv(varName, &currentValue))
+                {
+                    // Variable exists, ask if the user wants to add or edit
+                    wxMessageDialog modifyDialog(
+                        this,
+                        "The variable already exists. Would you like to add to it or replace it?\n"
+                        "Click Yes to Add, No to Replace.",
+                        "Modify Environment Variable",
+                        wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+                    int modifyChoice = modifyDialog.ShowModal();
+
+                    if (modifyChoice == wxID_YES)
+                    {
+                        // Add to the variable
+                        wxTextEntryDialog varValueDialog(
+                            this,
+                            "Enter the value to add to the variable:",
+                            "Add to Environment Variable",
+                            "",
+                            wxOK | wxCANCEL);
+
+                        if (varValueDialog.ShowModal() == wxID_OK)
+                        {
+                            wxString newValue = varValueDialog.GetValue().Trim();
+
+                            if (!newValue.IsEmpty())
+                            {
+                                // Append the new value to the existing variable
+                                wxString updatedValue = currentValue + newValue + ";";
+                                m_listBox->AppendString("Set Environment Variable (Add): " + varName + "=" + updatedValue);
+                            }
+                            else
+                            {
+                                wxMessageBox("Variable value cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                            }
+                        }
+                    }
+                    else if (modifyChoice == wxID_NO)
+                    {
+                        // Replace the variable
+                        wxTextEntryDialog varValueDialog(
+                            this,
+                            "Enter the new value for the variable:",
+                            "Replace Environment Variable",
+                            "",
+                            wxOK | wxCANCEL);
+
+                        if (varValueDialog.ShowModal() == wxID_OK)
+                        {
+                            wxString newValue = varValueDialog.GetValue().Trim();
+
+                            if (!newValue.IsEmpty())
+                            {
+                                m_listBox->AppendString("Set Environment Variable (Replace): " + varName + "=" + newValue);
+                            }
+                            else
+                            {
+                                wxMessageBox("Variable value cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    // Variable doesn't exist, create a new one
+                    wxTextEntryDialog varValueDialog(
+                        this,
+                        "The variable does not exist. Enter the value to create it:",
+                        "Create Environment Variable",
+                        "",
+                        wxOK | wxCANCEL);
+
+                    if (varValueDialog.ShowModal() == wxID_OK)
+                    {
+                        wxString newValue = varValueDialog.GetValue().Trim();
+
+                        if (!newValue.IsEmpty())
+                        {
+                            m_listBox->AppendString("Set Environment Variable (Create): " + varName + "=" + newValue);
+                        }
+                        else
+                        {
+                            wxMessageBox("Variable value cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                wxMessageBox("Variable name cannot be empty!", "Error", wxOK | wxICON_ERROR);
+            }
+        }
+    }
     else
     {
         // For other options, just add the option name to the list box
@@ -249,6 +362,40 @@ void cMain::OnSaveScriptClicked(wxCommandEvent& evt)
             wxString filePath = item.Mid(13).Trim();  // Extract file path
             scriptFile << "type nul > \"" << filePath.ToStdString() << "\"" << std::endl;
         }
+        else if (item.StartsWith("Set Environment Variable (Add): "))
+        {
+            wxString command = item.Mid(32).Trim();  // Extract the variable name and value
+            size_t eqPos = command.Find('=');
+            if (eqPos != wxNOT_FOUND)
+            {
+                wxString varName = command.SubString(0, eqPos - 1);
+                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+                scriptFile << "setx " << varName.ToStdString() << " \"" << varValue.ToStdString() << "\"" << std::endl;
+            }
+        }
+        else if (item.StartsWith("Set Environment Variable (Replace): "))
+        {
+            wxString command = item.Mid(36).Trim();  // Extract the variable name and value
+            size_t eqPos = command.Find('=');
+            if (eqPos != wxNOT_FOUND)
+            {
+                wxString varName = command.SubString(0, eqPos - 1);
+                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+                scriptFile << "setx " << varName.ToStdString() << " \"" << varValue.ToStdString() << "\"" << std::endl;
+            }
+        }
+        else if (item.StartsWith("Set Environment Variable (Create): "))
+        {
+            wxString command = item.Mid(35).Trim();  // Extract the variable name and value
+            size_t eqPos = command.Find('=');
+            if (eqPos != wxNOT_FOUND)
+            {
+                wxString varName = command.SubString(0, eqPos - 1);
+                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+                scriptFile << "setx " << varName.ToStdString() << " \"" << varValue.ToStdString() << "\"" << std::endl;
+            }
+        }
+
     }
 
     scriptFile.close();

@@ -16,6 +16,7 @@ public:
 	wxChoice* m_choice = nullptr;     // Dropdown menu
 	wxButton* m_btnAdd = nullptr;     // "+" Button
 	wxListBox* m_listBox = nullptr;   // Middle box for displaying options
+	wxTextCtrl* m_txtScriptName = nullptr;
 	wxButton* m_btnSave = nullptr;
 	wxString m_selectedFilePath;
 

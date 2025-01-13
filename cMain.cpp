@@ -11,9 +11,6 @@ wxEND_EVENT_TABLE()
 
 cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSize(800, 600))
 {
-	//m_btn1 = new wxButton(this, 1001, "Click Me", wxPoint(10, 10), wxSize(150, 50));
-	//m_txt1 = new wxTextCtrl(this, wxID_ANY, "", wxPoint(10, 70), wxSize(300, 30));
-	//m_list1 = new wxListBox(this, wxID_ANY, wxPoint(10, 110), wxSize(300, 300));
     wxBoxSizer* vbox = new wxBoxSizer(wxVERTICAL);
 
     // Dropdown (wxChoice) to select options
@@ -31,12 +28,25 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     vbox->Add(m_btnAdd, 0, wxALIGN_LEFT | wxTOP, 0);  // Center horizontally, 0 px from the dropdown
 
     // Middle box (wxListBox) to display selected options
-    m_listBox = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(300, 300));
+    m_listBox = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(500, 300));
     vbox->Add(m_listBox, 1, wxALIGN_CENTER | wxALL, 10);  // Expandable and centered
+
+    // Horizontal sizer for Save Script Button and Textbox
+    wxBoxSizer* saveBox = new wxBoxSizer(wxHORIZONTAL);
+
+    // Label for the text box
+    wxStaticText* lblScriptName = new wxStaticText(this, wxID_ANY, "File Name:", wxDefaultPosition, wxDefaultSize);
+    saveBox->Add(lblScriptName, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);  // Add label with spacing to the right
+
+    // Textbox for custom script name
+    m_txtScriptName = new wxTextCtrl(this, wxID_ANY, "", wxDefaultPosition, wxSize(150, 30));
+    saveBox->Add(m_txtScriptName, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
 
     // Save Script Button
     m_btnSave = new wxButton(this, 1002, "Save Script", wxDefaultPosition, wxSize(100, 30));
-    vbox->Add(m_btnSave, 0, wxALIGN_CENTER | wxTOP, 10);  // Place button below the list box
+    saveBox->Add(m_btnSave, 0, wxALIGN_CENTER_VERTICAL);
+
+    vbox->Add(saveBox, 0, wxALIGN_CENTER | wxTOP, 10);
 
     // Set the sizer for the frame
     this->SetSizer(vbox);
@@ -88,6 +98,20 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
 
 void cMain::OnSaveScriptClicked(wxCommandEvent& evt)
 {
+    // Get the custom script name from the text box
+    wxString scriptName = m_txtScriptName->GetValue().Trim();
+    if (scriptName.IsEmpty())
+    {
+        wxMessageBox("Please enter a name for the script!", "Error", wxOK | wxICON_ERROR);
+        return;
+    }
+
+    // Add the .bat extension if not already present
+    if (!scriptName.EndsWith(".bat"))
+    {
+        scriptName += ".bat";
+    }
+
     // Get the standard paths to create the results folder
     wxString resultsPath = wxStandardPaths::Get().GetExecutablePath();
     wxFileName exePath(resultsPath);
@@ -100,7 +124,7 @@ void cMain::OnSaveScriptClicked(wxCommandEvent& evt)
     }
 
     // Script file path
-    wxString scriptPath = resultsDir + "run_script.bat";
+    wxString scriptPath = resultsDir + scriptName;
 
     // Open file for writing
     std::ofstream scriptFile(scriptPath.ToStdString());

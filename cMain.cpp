@@ -20,6 +20,7 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     choices.Add("Create Folder");
     choices.Add("Create File");
     choices.Add("Add/Edit Environment Variables");
+    choices.Add("Checkpoint");
     m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
     vbox->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);  // Center horizontally, 10px from the top
 
@@ -286,6 +287,32 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             }
         }
     }
+    else if (selectedOption == "Checkpoint")
+    {
+        wxTextEntryDialog nameDialog(
+            this,
+            "Enter Checkpoint Message",
+            "CHECKPOINT--",
+            "",
+            wxOK | wxCANCEL);
+
+        if (nameDialog.ShowModal() == wxID_OK)
+        {
+            wxString message = nameDialog.GetValue().Trim(); // Get the mesage
+
+            // Ensure the folder name is valid
+            if (!message.IsEmpty())
+            {
+
+                // Add to the list box
+                m_listBox->AppendString("CHECKPOINT: " + message);
+            }
+            else
+            {
+                wxMessageBox("Checkpoint message cannot be empty!", "Error", wxOK | wxICON_ERROR);
+            }
+        }
+    }
     else
     {
         // For other options, just add the option name to the list box
@@ -394,6 +421,11 @@ void cMain::OnSaveScriptClicked(wxCommandEvent& evt)
                 wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
                 scriptFile << "setx " << varName.ToStdString() << " \"" << varValue.ToStdString() << "\"" << std::endl;
             }
+        }
+        else if (item.StartsWith("CHECKPOINT: "))
+        {
+            wxString message = item.Mid(14);  // Extract the path after "Run .exe: "
+            scriptFile << "Pause. >nul | echo.  \"" << message.ToStdString() << "\"" << std::endl;
         }
 
     }

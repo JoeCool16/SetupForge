@@ -3,6 +3,9 @@
 #include <wx/filefn.h>
 #include <wx/filename.h>
 #include <wx/process.h>
+#include <regex>
+#include <iostream>
+#include <string>
 #include <Windows.h>
 #include <wx/dir.h>
 #include <fstream>
@@ -119,7 +122,7 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     // Dropdown (wxChoice) to select options
     wxArrayString choices;
     choices.Add("Run an Exe");
-    choices.Add("Move File");
+    choices.Add("Insert File");
     choices.Add("Create Folder");
     choices.Add("Create File");
     choices.Add("Add/Edit Environment Variables");
@@ -199,12 +202,12 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             m_listBox->AppendString("Run .exe: " + filePath);
         }
     }
-    else if (selectedOption == "Move File")
+    else if (selectedOption == "Insert File")
     {
         // File dialog for selecting the source file
         wxFileDialog sourceFileDialog(
             this,
-            "Select the file to move",
+            "Select the file to insert",
             resultsDir,  // Set the initial path to the results folder
             "",
             "All files (*.*)|*.*",
@@ -214,10 +217,14 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
         {
             wxString sourcePath = sourceFileDialog.GetPath();
 
+            // Extract the file name from the source path
+            wxFileName sourceFile(sourcePath);
+            wxString fileName = sourceFile.GetFullName();  // This gives just the file name (including extension)
+
             // File dialog for selecting the destination folder
             wxDirDialog destinationDirDialog(
                 this,
-                "Select the destination folder",
+                "Select where to insert file",
                 "",
                 wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
 
@@ -225,8 +232,11 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             {
                 wxString destinationPath = destinationDirDialog.GetPath();
 
+                // Append the file name to the destination path
+                wxFileName destinationFile(destinationPath, fileName);  // Combine folder and file name
+
                 // Append the move command to the list box
-                m_listBox->AppendString("Move: \"" + sourcePath + "\" \"" + destinationPath + "\"");
+                m_listBox->AppendString("Move: \"" + sourcePath + "\" \"" + destinationFile.GetFullPath() + "\"");
             }
         }
     }
@@ -600,15 +610,18 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
         }
         else if (item.StartsWith("Move: "))
         {
-            // Extract the move command after "Move: "
-            wxString moveCommand = item.Mid(6).Trim();
-            size_t spacePos = moveCommand.Find(" ");
-            if (spacePos != wxNOT_FOUND)
-            {
-                wxString sourcePath = moveCommand.SubString(0, spacePos - 1);
-                wxString destinationPath = moveCommand.SubString(spacePos + 1, moveCommand.Length() - 1);
-                FileMover(sourcePath, destinationPath);  // Call the function to move the file
-            }
+            // Step 1: Remove "Move: " part (6 characters)
+            item = item.Mid(7);
+
+            // Step 2: Extract the first path
+            wxString first_path = item.BeforeFirst('\"');  // Extract everything before the first quote
+
+            // Step 3: Extract the second path
+            wxString second_path = item.Mid(first_path.Len() + 3);  // Skip past the first quote and path
+
+            second_path = second_path.BeforeFirst('\"');  // Extract everything before the next quote
+
+            FileMover(first_path, second_path);
         }
         else if (item.StartsWith("Create Folder: "))
         {
@@ -661,7 +674,7 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
         else if (item.StartsWith("CHECKPOINT: "))
         {
             // Extract the checkpoint message after "CHECKPOINT: "
-            wxString message = item.Mid(14);
+            wxString message = item.Mid(12);
 
             // Show a message dialog with a "Next" button to pause execution
             wxMessageDialog* checkpointDialog = new wxMessageDialog(

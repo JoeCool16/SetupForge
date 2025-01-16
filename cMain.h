@@ -21,6 +21,7 @@ public:
 	wxButton* m_btnSaveListbox = nullptr;
 	wxButton* m_btnOpenListbox = nullptr;
 	wxString m_selectedFilePath;
+	wxArrayString choices;
 
 	void OnButtonClicked(wxCommandEvent& evt);
 	void OnRunScriptClicked(wxCommandEvent& evt);

@@ -125,7 +125,6 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     wxBoxSizer* vbox = new wxBoxSizer(wxVERTICAL);
 
     // Dropdown (wxChoice) to select options
-    wxArrayString choices;
     choices.Add("Run an Exe");
     choices.Add("Insert File");
     choices.Add("Create Folder");
@@ -198,27 +197,204 @@ cMain::~cMain()
 
 void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
 {
-    // Get the selected item's index
+    // Get the index of the selected item
     int selectedIndex = m_listBox->GetSelection();
-    if (selectedIndex == wxNOT_FOUND) return; // No selection made
+    if (selectedIndex == wxNOT_FOUND) return; // No item is selected
 
     // Get the current value of the selected item
     wxString currentValue = m_listBox->GetString(selectedIndex);
 
-    // Create a text entry dialog for editing
-    wxTextEntryDialog editDialog(this, "Edit item:", "Edit List Item", currentValue);
-    if (editDialog.ShowModal() == wxID_OK)
+    // Create a SingleChoiceDialog for the user to pick a new option
+    wxSingleChoiceDialog choiceDialog(this, "Choose a new option:", "Edit List Item", choices);
+    if (choiceDialog.ShowModal() == wxID_OK)
     {
-        // Get the new value from the dialog
-        wxString newValue = editDialog.GetValue();
+        // Get the user's new choice
+        wxString selectedOption = choiceDialog.GetStringSelection();
 
-        // Update the item in the list box
-        if (!newValue.IsEmpty())
+        // Handle the selected option
+        if (selectedOption == "Run an Exe")
         {
-            m_listBox->SetString(selectedIndex, newValue);
+            wxFileDialog openFileDialog(
+                this,
+                "Select an .exe file",
+                wxEmptyString,
+                "",
+                "Executable files (*.exe)|*.exe",
+                wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+            if (openFileDialog.ShowModal() == wxID_OK)
+            {
+                wxString filePath = openFileDialog.GetPath();
+                m_listBox->SetString(selectedIndex, "Run .exe: " + filePath);
+            }
+        }
+        else if (selectedOption == "Insert File")
+        {
+            wxFileDialog sourceFileDialog(
+                this,
+                "Select the file to insert",
+                wxEmptyString,
+                "",
+                "All files (*.*)|*.*",
+                wxFD_OPEN | wxFD_FILE_MUST_EXIST);
+
+            if (sourceFileDialog.ShowModal() == wxID_OK)
+            {
+                wxString sourcePath = sourceFileDialog.GetPath();
+                wxFileName sourceFile(sourcePath);
+                wxString fileName = sourceFile.GetFullName();
+
+                wxDirDialog destinationDirDialog(
+                    this,
+                    "Select where to insert file",
+                    "",
+                    wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+
+                if (destinationDirDialog.ShowModal() == wxID_OK)
+                {
+                    wxString destinationPath = destinationDirDialog.GetPath();
+                    wxFileName destinationFile(destinationPath, fileName);
+                    m_listBox->SetString(selectedIndex, "Move: \"" + sourcePath + "\" \"" + destinationFile.GetFullPath() + "\"");
+                }
+            }
+        }
+        else if (selectedOption == "Create Folder")
+        {
+            wxDirDialog folderDialog(
+                this,
+                "Select the base folder where the new folder will be created:",
+                "",
+                wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+
+            if (folderDialog.ShowModal() == wxID_OK)
+            {
+                wxString basePath = folderDialog.GetPath();
+
+                wxTextEntryDialog nameDialog(
+                    this,
+                    "Enter the name of the new folder:",
+                    "New Folder Name",
+                    "",
+                    wxOK | wxCANCEL);
+
+                if (nameDialog.ShowModal() == wxID_OK)
+                {
+                    wxString folderName = nameDialog.GetValue().Trim();
+                    if (!folderName.IsEmpty())
+                    {
+                        wxString fullFolderPath = basePath + "\\" + folderName;
+                        m_listBox->SetString(selectedIndex, "Create Folder: " + fullFolderPath);
+                    }
+                    else
+                    {
+                        wxMessageBox("Folder name cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                    }
+                }
+            }
+        }
+        else if (selectedOption == "Create File")
+        {
+            wxFileDialog fileDialog(
+                this,
+                "Select a file to create:",
+                wxEmptyString,
+                "",
+                "All files (*.*)|*.*",
+                wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+            if (fileDialog.ShowModal() == wxID_OK)
+            {
+                wxString filePath = fileDialog.GetPath();
+                m_listBox->SetString(selectedIndex, "Create File: " + filePath);
+            }
+        }
+        else if (selectedOption == "Add/Edit Environment Variables")
+        {
+            wxTextEntryDialog varNameDialog(
+                this,
+                "Enter the name of the environment variable (e.g., PATH):",
+                "Add/Edit Environment Variable",
+                "",
+                wxOK | wxCANCEL);
+
+            if (varNameDialog.ShowModal() == wxID_OK)
+            {
+                wxString varName = varNameDialog.GetValue().Trim();
+                if (!varName.IsEmpty())
+                {
+                    wxString currentValue;
+                    if (wxGetEnv(varName, &currentValue))
+                    {
+                        wxMessageDialog modifyDialog(
+                            this,
+                            "The variable already exists. Would you like to add to it or replace it?\n"
+                            "Click Yes to Add, No to Replace.",
+                            "Modify Environment Variable",
+                            wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+                        int modifyChoice = modifyDialog.ShowModal();
+                        if (modifyChoice == wxID_YES)
+                        {
+                            wxTextEntryDialog varValueDialog(
+                                this,
+                                "Enter the value to add to the variable:",
+                                "Add to Environment Variable",
+                                "",
+                                wxOK | wxCANCEL);
+
+                            if (varValueDialog.ShowModal() == wxID_OK)
+                            {
+                                wxString newValue = varValueDialog.GetValue().Trim();
+                                if (!newValue.IsEmpty())
+                                {
+                                    wxString updatedValue = currentValue + ";" + newValue;
+                                    m_listBox->SetString(selectedIndex, "Set Environment Variable (Add): " + varName + "=" + updatedValue);
+                                }
+                            }
+                        }
+                        else if (modifyChoice == wxID_NO)
+                        {
+                            wxTextEntryDialog varValueDialog(
+                                this,
+                                "Enter the new value for the variable:",
+                                "Replace Environment Variable",
+                                "",
+                                wxOK | wxCANCEL);
+
+                            if (varValueDialog.ShowModal() == wxID_OK)
+                            {
+                                wxString newValue = varValueDialog.GetValue().Trim();
+                                if (!newValue.IsEmpty())
+                                {
+                                    m_listBox->SetString(selectedIndex, "Set Environment Variable (Replace): " + varName + "=" + newValue);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else if (selectedOption == "Checkpoint")
+        {
+            wxTextEntryDialog nameDialog(
+                this,
+                "Enter Checkpoint Message",
+                "CHECKPOINT--",
+                "",
+                wxOK | wxCANCEL);
+
+            if (nameDialog.ShowModal() == wxID_OK)
+            {
+                wxString message = nameDialog.GetValue().Trim();
+                if (!message.IsEmpty())
+                {
+                    m_listBox->SetString(selectedIndex, "CHECKPOINT: " + message);
+                }
+            }
         }
     }
 }
+
 
 void cMain::OnDeleteButtonClicked(wxCommandEvent& evt)
 {

@@ -131,17 +131,29 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
     vbox->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);  // Center horizontally, 10px from the top
 
+    // Create a horizontal sizer for the buttons and progress bar
     wxBoxSizer* hboxButtons = new wxBoxSizer(wxHORIZONTAL);
 
     // "+" Button to add the selected option to the list
     m_btnAdd = new wxButton(this, 1001, "+", wxDefaultPosition, wxSize(50, 30));
-    hboxButtons->Add(m_btnAdd, 0, wxRIGHT, 20);  // Center horizontally, 0 px from the dropdown
+    hboxButtons->Add(m_btnAdd, 0, wxRIGHT, 10);  // Add 10px of space to the right of "+"
 
-    // Add a Delete button below the ListBox
+    // "-" Button to delete the selected option
     m_btnDelete = new wxButton(this, 1005, "-", wxDefaultPosition, wxSize(50, 30));
-    hboxButtons->Add(m_btnDelete, 0, wxALIGN_LEFT | wxTOP, 0); // Center and add some space
+    hboxButtons->Add(m_btnDelete, 0, wxRIGHT, 10);  // Add 10px of space to the right of "-"
 
-    vbox->Add(hboxButtons, 0, wxALIGN_LEFT | wxTOP, 10);
+    // Add a flexible spacer to push the progress bar to the center
+    hboxButtons->AddStretchSpacer(1);  // Push everything after this to the right
+
+    // Progress Bar
+    m_progressBar = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(380, 25));
+    hboxButtons->Add(m_progressBar, 0, wxALIGN_CENTER_VERTICAL);  // Center the progress bar vertically
+
+    // Add another flexible spacer after the progress bar (optional)
+    hboxButtons->AddStretchSpacer(1);  // Ensure symmetry, but this is optional
+
+    // Add the horizontal sizer to the main vertical sizer
+    vbox->Add(hboxButtons, 0, wxEXPAND | wxTOP, 10);
 
     // Middle box (wxListBox) to display selected options
     m_listBox = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(500, 300));
@@ -625,10 +637,16 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
 
         return;
     }
+    m_progressBar->SetRange(m_listBox->GetCount());
+
     // Iterate over the items in the list box and execute actions directly
     for (unsigned int i = 0; i < m_listBox->GetCount(); i++)
     {
         wxString item = m_listBox->GetString(i);
+
+        // Update the progress bar
+        m_progressBar->SetValue(i + 1);
+
 
         if (item.StartsWith("Run .exe: "))
         {

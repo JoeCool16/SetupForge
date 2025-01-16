@@ -12,7 +12,7 @@ public:
 	wxButton* m_btn1 = nullptr;
 	wxTextCtrl* m_txt1 = nullptr;
 	wxListBox* m_list1 = nullptr;
-
+	wxGauge* m_progressBar = nullptr;
 	wxChoice* m_choice = nullptr;     // Dropdown menu
 	wxButton* m_btnAdd = nullptr;     // "+" Button
 	wxListBox* m_listBox = nullptr;   // Middle box for displaying options

@@ -27,6 +27,7 @@ public:
 	void OnSaveListboxClicked(wxCommandEvent& evt);
 	void OnOpenListboxClicked(wxCommandEvent& evt);
 	void OnDeleteButtonClicked(wxCommandEvent& evt);
+	void OnListBoxDoubleClick(wxCommandEvent& evt);
 
 	// Utility functions for actions
 	void RunExe(const wxString& exePath);

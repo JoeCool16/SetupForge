@@ -163,6 +163,8 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     m_listBox = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(500, 300));
     vbox->Add(m_listBox, 1, wxALIGN_CENTER | wxALL, 10);  // Expandable and centered
 
+    m_listBox->Bind(wxEVT_LISTBOX_DCLICK, &cMain::OnListBoxDoubleClick, this);
+
     // Box to hold the buttons for saving and opening listbox files
     wxBoxSizer* fileBox = new wxBoxSizer(wxHORIZONTAL);
 
@@ -192,6 +194,30 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
 
 cMain::~cMain()
 {
+}
+
+void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
+{
+    // Get the selected item's index
+    int selectedIndex = m_listBox->GetSelection();
+    if (selectedIndex == wxNOT_FOUND) return; // No selection made
+
+    // Get the current value of the selected item
+    wxString currentValue = m_listBox->GetString(selectedIndex);
+
+    // Create a text entry dialog for editing
+    wxTextEntryDialog editDialog(this, "Edit item:", "Edit List Item", currentValue);
+    if (editDialog.ShowModal() == wxID_OK)
+    {
+        // Get the new value from the dialog
+        wxString newValue = editDialog.GetValue();
+
+        // Update the item in the list box
+        if (!newValue.IsEmpty())
+        {
+            m_listBox->SetString(selectedIndex, newValue);
+        }
+    }
 }
 
 void cMain::OnDeleteButtonClicked(wxCommandEvent& evt)
@@ -589,7 +615,7 @@ void cMain::OnOpenListboxClicked(wxCommandEvent& evt)
     listboxFile.close();
 
     // Inform the user that the listbox has been loaded
-    wxMessageBox("Listbox loaded from: " + fileName, "Success", wxOK | wxICON_INFORMATION);
+    // wxMessageBox("Listbox loaded from: " + fileName, "Success", wxOK | wxICON_INFORMATION);
 }
 
 
@@ -741,7 +767,7 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
     }
 
     // Inform the user that the operations were executed
-    wxMessageBox("Operations executed successfully!", "Success", wxOK | wxICON_INFORMATION);
+    // wxMessageBox("Operations executed successfully!", "Success", wxOK | wxICON_INFORMATION);
 }
 
 

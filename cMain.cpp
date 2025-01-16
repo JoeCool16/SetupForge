@@ -118,6 +118,10 @@ void cMain::SetEV(const wxString& varName, const wxString& varValue, bool append
 
 cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSize(800, 600))
 {
+    wxIcon appIcon;
+    appIcon.LoadFile("app_icon.ico", wxBITMAP_TYPE_ICO);
+    SetIcon(appIcon);
+
     wxBoxSizer* vbox = new wxBoxSizer(wxVERTICAL);
 
     // Dropdown (wxChoice) to select options

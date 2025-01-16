@@ -929,12 +929,23 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
             wxString message = item.Mid(12);
 
             // Show a message dialog with a "Next" button to pause execution
-            wxMessageDialog* checkpointDialog = new wxMessageDialog(
-                this,
-                message + "\nClick 'Next' to proceed.",
-                "Checkpoint",
-                wxOK | wxICON_INFORMATION
-            );
+            wxDialog* checkpointDialog = new wxDialog(
+                this, wxID_ANY, "Checkpoint", wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+
+            // Add a vertical box sizer for layout
+            wxBoxSizer* vbox = new wxBoxSizer(wxVERTICAL);
+
+            // Add the message as a static text
+            wxStaticText* messageText = new wxStaticText(checkpointDialog, wxID_ANY, message);
+            vbox->Add(messageText, 1, wxALL | wxEXPAND, 10);
+
+            // Add a "Next" button
+            wxButton* nextButton = new wxButton(checkpointDialog, wxID_OK, "Next");
+            vbox->Add(nextButton, 0, wxALIGN_CENTER | wxALL, 10);
+
+            // Set the sizer for the dialog
+            checkpointDialog->SetSizerAndFit(vbox);
+            checkpointDialog->SetSize(wxSize(300, 200));
 
             // Show the dialog and wait for the user to click "OK" (Next)
             checkpointDialog->ShowModal();

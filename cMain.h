@@ -17,6 +17,7 @@ public:
 	wxButton* m_btnAdd = nullptr;     // "+" Button
 	wxListBox* m_listBox = nullptr;   // Middle box for displaying options
 	wxButton* m_btnSave = nullptr;
+	wxButton* m_btnDelete = nullptr;
 	wxButton* m_btnSaveListbox = nullptr;
 	wxButton* m_btnOpenListbox = nullptr;
 	wxString m_selectedFilePath;
@@ -25,6 +26,7 @@ public:
 	void OnRunScriptClicked(wxCommandEvent& evt);
 	void OnSaveListboxClicked(wxCommandEvent& evt);
 	void OnOpenListboxClicked(wxCommandEvent& evt);
+	void OnDeleteButtonClicked(wxCommandEvent& evt);
 
 	// Utility functions for actions
 	void RunExe(const wxString& exePath);

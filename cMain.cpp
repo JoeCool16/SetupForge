@@ -15,6 +15,7 @@ wxBEGIN_EVENT_TABLE(cMain, wxFrame)
     EVT_BUTTON(1002, OnRunScriptClicked)
     EVT_BUTTON(1003, OnSaveListboxClicked)
     EVT_BUTTON(1004, OnOpenListboxClicked)
+    EVT_BUTTON(1005, OnDeleteButtonClicked)
 wxEND_EVENT_TABLE()
 
 // Run an Executable (.exe)
@@ -130,9 +131,17 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
     vbox->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);  // Center horizontally, 10px from the top
 
+    wxBoxSizer* hboxButtons = new wxBoxSizer(wxHORIZONTAL);
+
     // "+" Button to add the selected option to the list
     m_btnAdd = new wxButton(this, 1001, "+", wxDefaultPosition, wxSize(50, 30));
-    vbox->Add(m_btnAdd, 0, wxALIGN_LEFT | wxTOP, 0);  // Center horizontally, 0 px from the dropdown
+    hboxButtons->Add(m_btnAdd, 0, wxRIGHT, 20);  // Center horizontally, 0 px from the dropdown
+
+    // Add a Delete button below the ListBox
+    m_btnDelete = new wxButton(this, 1005, "-", wxDefaultPosition, wxSize(50, 30));
+    hboxButtons->Add(m_btnDelete, 0, wxALIGN_LEFT | wxTOP, 0); // Center and add some space
+
+    vbox->Add(hboxButtons, 0, wxALIGN_LEFT | wxTOP, 10);
 
     // Middle box (wxListBox) to display selected options
     m_listBox = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(500, 300));
@@ -167,6 +176,25 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
 
 cMain::~cMain()
 {
+}
+
+void cMain::OnDeleteButtonClicked(wxCommandEvent& evt)
+{
+    // Get the currently selected item index
+    int selection = m_listBox->GetSelection();
+
+    if (selection != wxNOT_FOUND) // Ensure an item is selected
+    {
+        // Remove the selected item
+        m_listBox->Delete(selection);
+    }
+    else
+    {
+        // If no item is selected, show a message box
+        wxMessageBox("Please select an item to delete.", "No Selection", wxOK | wxICON_WARNING);
+    }
+
+    evt.Skip();
 }
 
 void cMain::OnButtonClicked(wxCommandEvent& evt)

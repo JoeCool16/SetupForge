@@ -47,7 +47,7 @@ void cMain::CreateFolder(const wxString& folderPath)
 {
     if (wxMkdir(folderPath))
     {
-        m_listBox->AppendString("Created Folder: " + folderPath);
+        return;
     }
     else
     {
@@ -62,7 +62,7 @@ void cMain::CreateFiles(const wxString& filePath)
     if (file.is_open())
     {
         file.close();
-        m_listBox->AppendString("Created File: " + filePath);
+        return;
     }
     else
     {
@@ -379,7 +379,7 @@ void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
             wxTextEntryDialog nameDialog(
                 this,
                 "Enter Checkpoint Message",
-                "CHECKPOINT--",
+                "--CHECKPOINT--",
                 "",
                 wxOK | wxCANCEL);
 

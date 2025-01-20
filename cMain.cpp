@@ -68,6 +68,9 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     vbox->Add(m_listBox, 1, wxALIGN_CENTER | wxALL, 10);  // Expandable and centered
 
     m_listBox->Bind(wxEVT_LISTBOX_DCLICK, &cMain::OnListBoxDoubleClick, this);
+    m_listBox->Bind(wxEVT_LEFT_DOWN, &cMain::OnListBoxMouseDown, this);
+    m_listBox->Bind(wxEVT_MOTION, &cMain::OnListBoxMouseMove, this);
+    m_listBox->Bind(wxEVT_LEFT_UP, &cMain::OnListBoxMouseUp, this);
 
     // Box to hold the buttons for saving and opening listbox files
     wxBoxSizer* fileBox = new wxBoxSizer(wxHORIZONTAL);
@@ -98,6 +101,46 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
 
 cMain::~cMain()
 {
+}
+
+void cMain::OnListBoxMouseDown(wxMouseEvent& event)
+{
+    // Capture the initial selection index when mouse is pressed
+    m_draggedIndex = m_listBox->HitTest(event.GetPosition());
+    event.Skip();
+}
+
+void cMain::OnListBoxMouseMove(wxMouseEvent& event)
+{
+    if (event.Dragging() && m_draggedIndex != wxNOT_FOUND)
+    {
+        // Determine where the item is being dragged to
+        int targetIndex = m_listBox->HitTest(event.GetPosition());
+
+        if (targetIndex != wxNOT_FOUND && targetIndex != m_draggedIndex)
+        {
+            wxString draggedItem = m_listBox->GetString(m_draggedIndex);
+
+            // Remove the dragged item from the list and reinsert at the target position
+            m_listBox->Delete(m_draggedIndex);
+            m_listBox->Insert(draggedItem, targetIndex);
+
+            // Update the new index position
+            m_draggedIndex = targetIndex;
+
+            // Select the moved item for better UX feedback
+            m_listBox->SetSelection(m_draggedIndex);
+        }
+    }
+
+    event.Skip();
+}
+
+void cMain::OnListBoxMouseUp(wxMouseEvent& event)
+{
+    // Reset the dragging state
+    m_draggedIndex = wxNOT_FOUND;
+    event.Skip();
 }
 
 // Run an Executable(.exe)

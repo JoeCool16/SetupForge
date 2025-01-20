@@ -8,6 +8,9 @@ public:
 	cMain();
 	~cMain();
 
+private:
+	int m_draggedIndex = wxNOT_FOUND;
+
 public:
 	wxButton* m_btn1 = nullptr;
 	wxTextCtrl* m_txt1 = nullptr;
@@ -29,6 +32,9 @@ public:
 	void OnOpenListboxClicked(wxCommandEvent& evt);
 	void OnDeleteButtonClicked(wxCommandEvent& evt);
 	void OnListBoxDoubleClick(wxCommandEvent& evt);
+	void OnListBoxMouseDown(wxMouseEvent& event);
+	void OnListBoxMouseMove(wxMouseEvent& event);
+	void OnListBoxMouseUp(wxMouseEvent& event);
 
 	// Utility functions for actions
 	void RunExe(const wxString& exePath);

@@ -3,6 +3,8 @@
 #include <wx/filefn.h>
 #include <wx/filename.h>
 #include <wx/process.h>
+#include <wx/msw/registry.h>
+#include <wx/msgdlg.h>
 #include <regex>
 #include <iostream>
 #include <string>
@@ -18,104 +20,6 @@ wxBEGIN_EVENT_TABLE(cMain, wxFrame)
     EVT_BUTTON(1005, OnDeleteButtonClicked)
 wxEND_EVENT_TABLE()
 
-// Run an Executable (.exe)
-void cMain::RunExe(const wxString& exePath)
-{
-    // Execute the file directly
-    int retCode = wxExecute(exePath, wxEXEC_SYNC);
-    if (retCode == -1)
-    {
-        wxMessageBox("Failed to execute the program!", "Error", wxOK | wxICON_ERROR);
-    }
-}
-
-// Move a file
-void cMain::FileMover(const wxString& sourcePath, const wxString& destinationPath)
-{
-    if (wxCopyFile(sourcePath, destinationPath))
-    {
-        m_listBox->AppendString("Moved: " + sourcePath + " to " + destinationPath);
-    }
-    else
-    {
-        wxMessageBox("Failed to move the file!", "Error", wxOK | wxICON_ERROR);
-    }
-}
-
-// Create a folder
-void cMain::CreateFolder(const wxString& folderPath)
-{
-    if (wxMkdir(folderPath))
-    {
-        return;
-    }
-    else
-    {
-        wxMessageBox("Failed to create the folder!", "Error", wxOK | wxICON_ERROR);
-    }
-}
-
-// Create a file
-void cMain::CreateFiles(const wxString& filePath)
-{
-    std::ofstream file(filePath.ToStdString(), std::ios::out);
-    if (file.is_open())
-    {
-        file.close();
-        return;
-    }
-    else
-    {
-        wxMessageBox("Failed to create the file!", "Error", wxOK | wxICON_ERROR);
-    }
-}
-
-// Set or add an environment variable
-void cMain::SetEV(const wxString& varName, const wxString& varValue, bool append)
-{
-    if (varName.IsEmpty() || varValue.IsEmpty())
-    {
-        wxMessageBox("Environment variable name or value cannot be empty!", "Error", wxOK | wxICON_ERROR);
-        return;
-    }
-
-    // Windows-specific code
-#if defined(_WIN32) || defined(_WIN64)
-    if (append)
-    {
-        // Try to get the current value of the environment variable
-        wxString currentValue;
-        if (wxGetEnv(varName, &currentValue))
-        {
-            // Append the new value to the current value
-            currentValue += ";" + varValue;
-
-            // Set the new value for the environment variable
-            if (!SetEnvironmentVariable(varName, currentValue))
-            {
-                wxMessageBox("Failed to append environment variable.", "Error", wxOK | wxICON_ERROR);
-            }
-        }
-        else
-        {
-            // If the variable doesn't exist, just set it to the new value
-            if (!SetEnvironmentVariable(varName, varValue))
-            {
-                wxMessageBox("Failed to set environment variable.", "Error", wxOK | wxICON_ERROR);
-            }
-        }
-    }
-    else
-    {
-        // Set the environment variable (this will overwrite it if it already exists)
-        if (!SetEnvironmentVariable(varName, varValue))
-        {
-            wxMessageBox("Failed to set environment variable.", "Error", wxOK | wxICON_ERROR);
-        }
-    }
-#endif
-}
-
 cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSize(800, 600))
 {
     wxIcon appIcon;
@@ -130,6 +34,7 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     choices.Add("Create Folder");
     choices.Add("Create File");
     choices.Add("Add/Edit Environment Variables");
+    choices.Add("Add/Edit System Environment Variables");
     choices.Add("Checkpoint");
     m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
     vbox->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);  // Center horizontally, 10px from the top
@@ -193,6 +98,190 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
 
 cMain::~cMain()
 {
+}
+
+// Run an Executable(.exe)
+void cMain::RunExe(const wxString & exePath)
+{
+    // Execute the file directly
+    int retCode = wxExecute(exePath, wxEXEC_SYNC);
+    if (retCode == -1)
+    {
+        wxMessageBox("Failed to execute the program!", "Error", wxOK | wxICON_ERROR);
+    }
+}
+
+// Move a file
+void cMain::FileMover(const wxString& sourcePath, const wxString& destinationPath)
+{
+    if (wxCopyFile(sourcePath, destinationPath))
+    {
+        m_listBox->AppendString("Moved: " + sourcePath + " to " + destinationPath);
+    }
+    else
+    {
+        wxMessageBox("Failed to move the file!", "Error", wxOK | wxICON_ERROR);
+    }
+}
+
+// Create a folder
+void cMain::CreateFolder(const wxString& folderPath)
+{
+    if (wxMkdir(folderPath))
+    {
+        return;
+    }
+    else
+    {
+        wxMessageBox("Failed to create the folder!", "Error", wxOK | wxICON_ERROR);
+    }
+}
+
+// Create a file
+void cMain::CreateFiles(const wxString& filePath)
+{
+    std::ofstream file(filePath.ToStdString(), std::ios::out);
+    if (file.is_open())
+    {
+        file.close();
+        return;
+    }
+    else
+    {
+        wxMessageBox("Failed to create the file!", "Error", wxOK | wxICON_ERROR);
+    }
+}
+
+wxString GetUserPathVariable(const wxString& varName)
+{
+    wxRegKey regKey(wxRegKey::HKCU, "Environment");
+    wxString userPathValue;
+
+    if (regKey.Exists())
+    {
+        if (regKey.HasValue(varName))
+        {
+            regKey.QueryValue(varName, userPathValue);
+        }
+        else
+        {
+            wxMessageBox("The specified environment variable does not exist.", "Info", wxOK | wxICON_INFORMATION);
+        }
+    }
+    else
+    {
+        wxMessageBox("Failed to access user environment variables.", "Error", wxOK | wxICON_ERROR);
+    }
+
+    return userPathValue;
+}
+wxString GetSystemPathVariable(const wxString& varName)
+{
+    // Access the SYSTEM environment variables registry location
+    wxRegKey regKey(wxRegKey::HKLM, "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment");
+    wxString systemPathValue;
+
+    if (regKey.Exists())
+    {
+        if (regKey.HasValue(varName))
+        {
+            regKey.QueryValue(varName, systemPathValue);
+        }
+        else
+        {
+            wxMessageBox("The specified system environment variable does not exist.", "Info", wxOK | wxICON_INFORMATION);
+        }
+    }
+    else
+    {
+        wxMessageBox("Failed to access system environment variables.", "Error", wxOK | wxICON_ERROR);
+    }
+
+    return systemPathValue;
+}
+
+
+// Set or add an environment variable
+void cMain::SetEV(const wxString& varName, const wxString& varValue, bool append)
+{
+    if (varName.IsEmpty() || varValue.IsEmpty())
+    {
+        wxMessageBox("Environment variable name or value cannot be empty!", "Error", wxOK | wxICON_ERROR);
+        return;
+    }
+
+    wxString command;
+    wxString currentValue;
+    wxArrayString output;
+
+    if (append)
+    {
+        // Retrieve the existing value using wxGetEnv (for current session)
+        if (wxGetEnv(varName, &currentValue))
+        {
+            currentValue = currentValue.Trim().Trim(false);  // Trim leading/trailing spaces
+        }
+        else
+        {
+            currentValue = "";  // If variable doesn't exist, start with empty value
+        }
+
+        // Append the new value, preventing duplicate entries
+        if (!currentValue.IsEmpty() && !currentValue.Contains(varValue))
+        {
+            currentValue += ";";
+        }
+        currentValue += varValue;
+
+        command = "setx " + varName + " \"" + currentValue + "\"";
+    }
+    else
+    {
+        // Replace the variable value
+        command = "setx " + varName + " \"" + varValue + "\"";
+    }
+
+    // Execute the command and check if successful
+    int result = wxExecute(command, wxEXEC_SYNC);
+    if (result == 0)
+    {
+        wxMessageBox("User environment variable updated successfully.\nYou may need to restart your session.",
+            "Success", wxOK | wxICON_INFORMATION);
+    }
+    else
+    {
+        wxMessageBox("Failed to update the environment variable.", "Error", wxOK | wxICON_ERROR);
+    }
+}
+void SetSystemEV(const wxString& varName, const wxString& varValue, bool append)
+{
+    if (varName.IsEmpty() || varValue.IsEmpty())
+    {
+        wxMessageBox("System environment variable name or value cannot be empty!", "Error", wxOK | wxICON_ERROR);
+        return;
+    }
+
+    wxString command;
+    wxArrayString output;
+
+    if (append)
+    {
+        // Retrieve existing value using command prompt (system-level variable)
+        wxExecute("cmd /c echo %" + varName + "%", output);
+        wxString existingValue = output.IsEmpty() ? "" : output[0];
+
+        // Append the new value
+        wxString updatedValue = existingValue + ";" + varValue;
+        command = "setx " + varName + " \"" + updatedValue + "\" /M";
+    }
+    else
+    {
+        // Replace the system environment variable
+        command = "setx " + varName + " \"" + varValue + "\" /M";
+    }
+
+    wxExecute(command);
+    wxMessageBox("System environment variable updated successfully.", "Success", wxOK | wxICON_INFORMATION);
 }
 
 void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
@@ -321,9 +410,9 @@ void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
             {
                 wxString varName = varNameDialog.GetValue().Trim();
                 if (!varName.IsEmpty())
-                {
-                    wxString currentValue;
-                    if (wxGetEnv(varName, &currentValue))
+                {   
+                    wxString currentValue = GetUserPathVariable(varName);
+                    if (!currentValue.IsEmpty())
                     {
                         wxMessageDialog modifyDialog(
                             this,
@@ -367,6 +456,72 @@ void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
                                 if (!newValue.IsEmpty())
                                 {
                                     m_listBox->SetString(selectedIndex, "Set Environment Variable (Replace): " + varName + "=" + newValue);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else if (selectedOption == "Add/Edit System Environment Variables")
+        {
+            wxTextEntryDialog varNameDialog(
+                this,
+                "Enter the name of the system environment variable (e.g., PATH):",
+                "Add/Edit System Environment Variable",
+                "",
+                wxOK | wxCANCEL);
+
+            if (varNameDialog.ShowModal() == wxID_OK)
+            {
+                wxString varName = varNameDialog.GetValue().Trim();
+                if (!varName.IsEmpty())
+                {
+                    wxString currentValue = GetSystemPathVariable(varName);
+                    if (!currentValue.IsEmpty())
+                    {
+                        wxMessageDialog modifyDialog(
+                            this,
+                            "The system variable already exists. Would you like to add to it or replace it?\n"
+                            "Click Yes to Add, No to Replace.",
+                            "Modify System Environment Variable",
+                            wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+                        int modifyChoice = modifyDialog.ShowModal();
+                        if (modifyChoice == wxID_YES)
+                        {
+                            wxTextEntryDialog varValueDialog(
+                                this,
+                                "Enter the value to add to the system variable:",
+                                "Add to System Environment Variable",
+                                "",
+                                wxOK | wxCANCEL);
+
+                            if (varValueDialog.ShowModal() == wxID_OK)
+                            {
+                                wxString newValue = varValueDialog.GetValue().Trim();
+                                if (!newValue.IsEmpty())
+                                {
+                                    wxString updatedValue = currentValue + ";" + newValue;
+                                    m_listBox->SetString(selectedIndex, "Set System Environment Variable (Add): " + varName + "=" + updatedValue);
+                                }
+                            }
+                        }
+                        else if (modifyChoice == wxID_NO)
+                        {
+                            wxTextEntryDialog varValueDialog(
+                                this,
+                                "Enter the new value for the system variable:",
+                                "Replace System Environment Variable",
+                                "",
+                                wxOK | wxCANCEL);
+
+                            if (varValueDialog.ShowModal() == wxID_OK)
+                            {
+                                wxString newValue = varValueDialog.GetValue().Trim();
+                                if (!newValue.IsEmpty())
+                                {
+                                    m_listBox->SetString(selectedIndex, "Set System Environment Variable (Replace): " + varName + "=" + newValue);
                                 }
                             }
                         }
@@ -561,9 +716,8 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             // Ensure the variable name is valid
             if (!varName.IsEmpty())
             {
-                // Check if the variable exists (user-level)
-                wxString currentValue;
-                if (wxGetEnv(varName, &currentValue))
+                wxString currentValue = GetUserPathVariable(varName);
+                if (!currentValue.IsEmpty())
                 {
                     // Variable exists, ask if the user wants to add or edit
                     wxMessageDialog modifyDialog(
@@ -654,6 +808,72 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             else
             {
                 wxMessageBox("Variable name cannot be empty!", "Error", wxOK | wxICON_ERROR);
+            }
+        }
+    }
+    else if (selectedOption == "Add/Edit System Environment Variables")
+    {
+        wxTextEntryDialog varNameDialog(
+            this,
+            "Enter the name of the system environment variable (e.g., PATH):",
+            "Add/Edit System Environment Variable",
+            "",
+            wxOK | wxCANCEL);
+
+        if (varNameDialog.ShowModal() == wxID_OK)
+        {
+            wxString varName = varNameDialog.GetValue().Trim();
+            if (!varName.IsEmpty())
+            {
+                wxString currentValue = GetSystemPathVariable(varName);
+                if (!currentValue.IsEmpty())
+                {
+                    wxMessageDialog modifyDialog(
+                        this,
+                        "The system variable already exists. Would you like to add to it or replace it?\n"
+                        "Click Yes to Add, No to Replace.",
+                        "Modify System Environment Variable",
+                        wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+                    int modifyChoice = modifyDialog.ShowModal();
+                    if (modifyChoice == wxID_YES)
+                    {
+                        wxTextEntryDialog varValueDialog(
+                            this,
+                            "Enter the value to add to the system variable:",
+                            "Add to System Environment Variable",
+                            "",
+                            wxOK | wxCANCEL);
+
+                        if (varValueDialog.ShowModal() == wxID_OK)
+                        {
+                            wxString newValue = varValueDialog.GetValue().Trim();
+                            if (!newValue.IsEmpty())
+                            {
+                                wxString updatedValue = currentValue + ";" + newValue;
+                                m_listBox->AppendString("Set System Environment Variable (Add): " + varName + "=" + updatedValue);
+                            }
+                        }
+                    }
+                    else if (modifyChoice == wxID_NO)
+                    {
+                        wxTextEntryDialog varValueDialog(
+                            this,
+                            "Enter the new value for the system variable:",
+                            "Replace System Environment Variable",
+                            "",
+                            wxOK | wxCANCEL);
+
+                        if (varValueDialog.ShowModal() == wxID_OK)
+                        {
+                            wxString newValue = varValueDialog.GetValue().Trim();
+                            if (!newValue.IsEmpty())
+                            {
+                                m_listBox->AppendString("Set System Environment Variable (Replace): " + varName + "=" + newValue);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -923,6 +1143,36 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
                 SetEV(varName, varValue, true);  // Call to create the environment variable
             }
         }
+        else if (item.StartsWith("Set System Environment Variable (Add): "))
+        {
+            // Extract the environment variable name and value after "Set System Environment Variable (Add): "
+            wxString command = item.Mid(39).Trim();  // Length of the prefix "Set System Environment Variable (Add): "
+            size_t eqPos = command.Find('=');
+            if (eqPos != wxNOT_FOUND)
+            {
+                wxString varName = command.SubString(0, eqPos - 1);
+                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+
+                // Call the function to append the system environment variable (true for append)
+                SetSystemEV(varName, varValue, true);
+            }
+        }
+        else if (item.StartsWith("Set System Environment Variable (Replace): "))
+        {
+            // Extract the environment variable name and value after "Set System Environment Variable (Replace): "
+            wxString command = item.Mid(43).Trim();  // Length of the prefix "Set System Environment Variable (Replace): "
+            size_t eqPos = command.Find('=');
+            if (eqPos != wxNOT_FOUND)
+            {
+                wxString varName = command.SubString(0, eqPos - 1);
+                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+
+                // Call the function to replace the system environment variable (false for replace)
+                SetSystemEV(varName, varValue, false);
+            }
+        }
+
+
         else if (item.StartsWith("CHECKPOINT: "))
         {
             // Extract the checkpoint message after "CHECKPOINT: "

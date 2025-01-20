@@ -53,9 +53,13 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     // Add a flexible spacer to push the progress bar to the center
     hboxButtons->AddStretchSpacer(1);  // Push everything after this to the right
 
+    // Step label right next to the progress bar
+    m_stepLabel = new wxStaticText(this, wxID_ANY, "Step: 0 out of 0", wxDefaultPosition, wxDefaultSize);
+    hboxButtons->Add(m_stepLabel, 0, wxALIGN_CENTER_VERTICAL);  // Align label to the center
+
     // Progress Bar
-    m_progressBar = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(380, 25));
-    hboxButtons->Add(m_progressBar, 0, wxALIGN_CENTER_VERTICAL);  // Center the progress bar vertically
+    m_progressBar = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(300, 25));
+    hboxButtons->Add(m_progressBar, 1, wxALIGN_CENTER_VERTICAL);
 
     // Add another flexible spacer after the progress bar (optional)
     hboxButtons->AddStretchSpacer(1);  // Ensure symmetry, but this is optional
@@ -1224,7 +1228,6 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
 
     wxString errorMarker = "Temp Restart Error Point (do not edit)";
 
-
     for (unsigned int i = 0; i < m_listBox->GetCount(); i++)
     {
         if (m_listBox->GetString(i) == errorMarker)
@@ -1244,8 +1247,11 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
         {
             wxString item = m_listBox->GetString(i);
 
-            // Update the progress bar
+            // Update the progress bar, it includes spaces
             m_progressBar->SetValue(i + 1);
+            wxString stepText = wxString::Format("Step: %d out of %d", i + 1, m_listBox->GetCount());
+            m_stepLabel->SetLabel(stepText);
+
             if (item.StartsWith("Run .exe: "))
             {
                 // Extract the path after "Run .exe: "

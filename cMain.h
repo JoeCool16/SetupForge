@@ -9,6 +9,7 @@ public:
 	~cMain();
 
 private:
+	wxStaticText* m_stepLabel = nullptr;  // Step progress label
 	int m_draggedIndex = wxNOT_FOUND;
 	wxString m_scriptDirectory;
 	int m_tempErrorPointIndex = -1;  // Stores the index of the error point, -1 means no error

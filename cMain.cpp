@@ -1024,14 +1024,30 @@ void cMain::OnSaveListboxClicked(wxCommandEvent& evt)
         fileName += ".txt";
     }
 
+    wxFileName filePath(fileName);
+    wxString baseName = filePath.GetName();  // Extract "test" from "test.txt"
+    wxString subDirPath = resultsDir + baseName + "\\";
+
+    // Create the subfolder if it doesn't exist
+    if (!wxDirExists(subDirPath))
+    {
+        if (!wxMkdir(subDirPath))
+        {
+            wxMessageBox("Failed to create the folder: " + subDirPath, "Error", wxOK | wxICON_ERROR);
+            return;  // Stop if folder creation fails
+        }
+    }
+    // Set the full path to save the file inside the subfolder
+    wxString finalFilePath = subDirPath + filePath.GetFullName();
+
     // Open file for writing
-    std::ofstream listboxFile(fileName.ToStdString(), std::ios::out);
+    std::ofstream listboxFile(finalFilePath.ToStdString(), std::ios::out);
 
     // Check if file opened successfully
     if (!listboxFile.is_open())
     {
         // Print the actual file path to the message box for better debugging
-        wxMessageBox("Failed to create the listbox file at: " + fileName, "Error", wxOK | wxICON_ERROR);
+        wxMessageBox("Failed to create the listbox file at: " + finalFilePath, "Error", wxOK | wxICON_ERROR);
         return;
     }
 
@@ -1045,7 +1061,7 @@ void cMain::OnSaveListboxClicked(wxCommandEvent& evt)
     listboxFile.close();
 
     // Inform the user that the listbox has been saved
-    wxMessageBox("Listbox saved to: " + fileName, "Success", wxOK | wxICON_INFORMATION);
+    wxMessageBox("Listbox saved to: " + finalFilePath, "Success", wxOK | wxICON_INFORMATION);
 }
 
 void cMain::OnOpenListboxClicked(wxCommandEvent& evt)

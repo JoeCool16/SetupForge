@@ -103,6 +103,42 @@ cMain::~cMain()
 {
 }
 
+void cMain::WriteToLog(const wxString& message)
+{
+    wxString logDirectory;
+
+    // Check if a script was opened and directory is set
+    if (!m_scriptDirectory.IsEmpty())
+    {
+        logDirectory = m_scriptDirectory + "\\";
+    }
+    else
+    {
+        // Default to executable directory if no script is opened
+        logDirectory = wxFileName(wxStandardPaths::Get().GetExecutablePath()).GetPath() + "\\";
+    }
+
+    wxString logFilePath = logDirectory + "app_log.txt";
+
+    // Open the log file in append mode
+    std::ofstream logFile(logFilePath.mb_str(), std::ios::app);
+
+    if (logFile.is_open())
+    {
+        // Get current timestamp
+        wxDateTime now = wxDateTime::Now();
+        wxString timestamp = now.FormatISOCombined(' ');  // Format: YYYY-MM-DD HH:MM:SS
+
+        // Write log entry
+        logFile << "[" << timestamp.mb_str() << "] " << message.mb_str() << std::endl;
+        logFile.close();
+    }
+    else
+    {
+        wxMessageBox("Failed to open log file at: " + logFilePath, "Error", wxOK | wxICON_ERROR);
+    }
+}
+
 void cMain::OnListBoxMouseDown(wxMouseEvent& event)
 {
     // Capture the initial selection index when mouse is pressed
@@ -150,7 +186,9 @@ void cMain::RunExe(const wxString & exePath)
     int retCode = wxExecute(exePath, wxEXEC_SYNC);
     if (retCode == -1)
     {
+        m_errorFlag = true;
         wxMessageBox("Failed to execute the program!", "Error", wxOK | wxICON_ERROR);
+        WriteToLog("Failed to execute the program!");
     }
 }
 
@@ -163,7 +201,10 @@ void cMain::FileMover(const wxString& sourcePath, const wxString& destinationPat
     }
     else
     {
+        m_errorFlag = true;
+        WriteToLog("Failed to move the file!");
         wxMessageBox("Failed to move the file!", "Error", wxOK | wxICON_ERROR);
+
     }
 }
 
@@ -176,6 +217,8 @@ void cMain::CreateFolder(const wxString& folderPath)
     }
     else
     {
+        m_errorFlag = true;
+        WriteToLog("Failed to create the folder!");
         wxMessageBox("Failed to create the folder!", "Error", wxOK | wxICON_ERROR);
     }
 }
@@ -191,6 +234,8 @@ void cMain::CreateFiles(const wxString& filePath)
     }
     else
     {
+        m_errorFlag = true;
+        WriteToLog("Failed to create the file!");
         wxMessageBox("Failed to create the file!", "Error", wxOK | wxICON_ERROR);
     }
 }
@@ -249,6 +294,8 @@ void cMain::SetEV(const wxString& varName, const wxString& varValue, bool append
 {
     if (varName.IsEmpty() || varValue.IsEmpty())
     {
+        m_errorFlag = true;
+        WriteToLog("Environment variable name or value cannot be empty!");
         wxMessageBox("Environment variable name or value cannot be empty!", "Error", wxOK | wxICON_ERROR);
         return;
     }
@@ -293,13 +340,17 @@ void cMain::SetEV(const wxString& varName, const wxString& varValue, bool append
     }
     else
     {
+        m_errorFlag = true;
+        WriteToLog("Failed to update the environment variable.");
         wxMessageBox("Failed to update the environment variable.", "Error", wxOK | wxICON_ERROR);
     }
 }
-void SetSystemEV(const wxString& varName, const wxString& varValue, bool append)
+void cMain::SetSystemEV(const wxString& varName, const wxString& varValue, bool append)
 {
     if (varName.IsEmpty() || varValue.IsEmpty())
     {
+        m_errorFlag = true;
+        WriteToLog("System environment variable name or value cannot be empty!");
         wxMessageBox("System environment variable name or value cannot be empty!", "Error", wxOK | wxICON_ERROR);
         return;
     }
@@ -1081,6 +1132,9 @@ void cMain::OnOpenListboxClicked(wxCommandEvent& evt)
         return;  // User canceled the file selection, so do nothing
     }
 
+    wxFileName scriptFile(fileName);
+    m_scriptDirectory = scriptFile.GetPath();
+
     // Open the file for reading
     std::ifstream listboxFile(fileName.ToStdString(), std::ios::in);
 
@@ -1106,7 +1160,6 @@ void cMain::OnOpenListboxClicked(wxCommandEvent& evt)
     // Inform the user that the listbox has been loaded
     // wxMessageBox("Listbox loaded from: " + fileName, "Success", wxOK | wxICON_INFORMATION);
 }
-
 
 void cMain::OnRunScriptClicked(wxCommandEvent& evt)
 {
@@ -1156,142 +1209,259 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
 
         return;
     }
-    m_progressBar->SetRange(m_listBox->GetCount());
-
-    // Iterate over the items in the list box and execute actions directly
+    int validItemCount = 0;
     for (unsigned int i = 0; i < m_listBox->GetCount(); i++)
     {
-        wxString item = m_listBox->GetString(i);
-
-        // Update the progress bar
-        m_progressBar->SetValue(i + 1);
-
-
-        if (item.StartsWith("Run .exe: "))
+        wxString item = m_listBox->GetString(i).Trim();
+        if (!item.IsEmpty())  // Count only non-empty items
         {
-            // Extract the path after "Run .exe: "
-            wxString exePath = item.Mid(10).Trim();
-            RunExe(exePath);  // Call the function to run the executable
+            validItemCount++;
         }
-        else if (item.StartsWith("Move: "))
+    }
+    m_progressBar->SetRange(validItemCount);
+
+    WriteToLog("Script started successfully.");
+
+    wxString errorMarker = "Temp Restart Error Point (do not edit)";
+
+
+    for (unsigned int i = 0; i < m_listBox->GetCount(); i++)
+    {
+        if (m_listBox->GetString(i) == errorMarker)
         {
-            // Step 1: Remove "Move: " part (6 characters)
-            item = item.Mid(7);
-
-            // Step 2: Extract the first path
-            wxString first_path = item.BeforeFirst('\"');  // Extract everything before the first quote
-
-            // Step 3: Extract the second path
-            wxString second_path = item.Mid(first_path.Len() + 3);  // Skip past the first quote and path
-
-            second_path = second_path.BeforeFirst('\"');  // Extract everything before the next quote
-
-            FileMover(first_path, second_path);
+            m_tempErrorPointIndex = i;
+            break;
         }
-        else if (item.StartsWith("Create Folder: "))
+    }
+
+    // Determine the starting point: use the error point if it exists, else start from the beginning
+    unsigned int startIndex = (m_tempErrorPointIndex != -1) ? m_tempErrorPointIndex : 0;
+
+    // Iterate over the items in the list box and execute actions directly
+    for (unsigned int i = startIndex; i < m_listBox->GetCount(); i++)
+    {
+        try
         {
-            // Extract folder path after "Create Folder: "
-            wxString folderPath = item.Mid(15).Trim();
-            CreateFolder(folderPath);  // Call the function to create the folder
-        }
-        else if (item.StartsWith("Create File: "))
-        {
-            // Extract file path after "Create File: "
-            wxString filePath = item.Mid(13).Trim();
-            CreateFiles(filePath);  // Call the function to create the file
-        }
-        else if (item.StartsWith("Set Environment Variable (Add): "))
-        {
-            // Extract the environment variable name and value after "Set Environment Variable (Add): "
-            wxString command = item.Mid(32).Trim();
-            size_t eqPos = command.Find('=');
-            if (eqPos != wxNOT_FOUND)
+            wxString item = m_listBox->GetString(i);
+
+            // Update the progress bar
+            m_progressBar->SetValue(i + 1);
+            if (item.StartsWith("Run .exe: "))
             {
-                wxString varName = command.SubString(0, eqPos - 1);
-                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
-                SetEV(varName, varValue, true);  // Call to append to the environment variable
+                // Extract the path after "Run .exe: "
+                wxString exePath = item.Mid(10).Trim();
+                wxString logMessage = wxString::Format("Performing operation: %d, Run .exe for path: %s", i, exePath);
+                WriteToLog(logMessage);
+                RunExe(exePath);  // Call the function to run the executable
+                WriteToLog("Successfully ran .exe");
+            }
+            else if (item.StartsWith("Move: "))
+            {
+                // Step 1: Remove "Move: " part (6 characters)
+                item = item.Mid(7);
+
+                wxString logMessage = wxString::Format("Performing operation: %d, Move", i);
+                WriteToLog(logMessage);
+
+                // Step 2: Extract the first path
+                wxString first_path = item.BeforeFirst('\"');  // Extract everything before the first quote
+
+                // Step 3: Extract the second path
+                wxString second_path = item.Mid(first_path.Len() + 3);  // Skip past the first quote and path
+
+                second_path = second_path.BeforeFirst('\"');  // Extract everything before the next quote
+
+                FileMover(first_path, second_path);
+                WriteToLog("Successfully moved files");
+            }
+            else if (item.StartsWith("Create Folder: "))
+            {
+                // Extract folder path after "Create Folder: "
+                wxString folderPath = item.Mid(15).Trim();
+
+                wxString logMessage = wxString::Format("Performing operation: %d, Create Folder", i);
+                WriteToLog(logMessage);
+
+                CreateFolder(folderPath);  // Call the function to create the folder
+                WriteToLog("Successfully created folder");
+            }
+            else if (item.StartsWith("Create File: "))
+            {
+                // Extract file path after "Create File: "
+                wxString filePath = item.Mid(13).Trim();
+
+                wxString logMessage = wxString::Format("Performing operation: %d, Create File", i);
+                WriteToLog(logMessage);
+                CreateFiles(filePath);  // Call the function to create the file
+                WriteToLog("Successfully created file");
+            }
+            else if (item.StartsWith("Set Environment Variable (Add): "))
+            {
+                // Extract the environment variable name and value after "Set Environment Variable (Add): "
+                wxString command = item.Mid(32).Trim();
+                wxString logMessage = wxString::Format("Performing operation: %d, Set Environment Variable (Add)", i);
+                WriteToLog(logMessage);
+
+                size_t eqPos = command.Find('=');
+                if (eqPos != wxNOT_FOUND)
+                {
+                    wxString varName = command.SubString(0, eqPos - 1);
+                    wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+                    SetEV(varName, varValue, true);  // Call to append to the environment variable
+                    WriteToLog("Successfully Set Environment Variable (Add)");
+                }
+            }
+            else if (item.StartsWith("Set Environment Variable (Replace): "))
+            {
+                // Extract the environment variable name and value after "Set Environment Variable (Replace): "
+                wxString command = item.Mid(36).Trim();
+                wxString logMessage = wxString::Format("Performing operation: %d, Set Environment Variable (Replace)", i);
+                WriteToLog(logMessage);
+                size_t eqPos = command.Find('=');
+                if (eqPos != wxNOT_FOUND)
+                {
+                    wxString varName = command.SubString(0, eqPos - 1);
+                    wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+                    SetEV(varName, varValue, false);  // Call to replace the environment variable
+                    WriteToLog("Successfully Set Environment Variable (Replace)");
+                }
+            }
+            else if (item.StartsWith("Set Environment Variable (Create): "))
+            {
+                // Extract the environment variable name and value after "Set Environment Variable (Create): "
+                wxString command = item.Mid(35).Trim();
+                wxString logMessage = wxString::Format("Performing operation: %d, Set Environment Variable (Create)", i);
+                WriteToLog(logMessage);
+                size_t eqPos = command.Find('=');
+                if (eqPos != wxNOT_FOUND)
+                {
+                    wxString varName = command.SubString(0, eqPos - 1);
+                    wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+                    SetEV(varName, varValue, true);  // Call to create the environment variable
+                    WriteToLog("Successfully Set Environment Variable (Create)");
+                }
+            }
+            else if (item.StartsWith("Set System Environment Variable (Add): "))
+            {
+                // Extract the environment variable name and value after "Set System Environment Variable (Add): "
+                wxString command = item.Mid(39).Trim();  // Length of the prefix "Set System Environment Variable (Add): "
+                wxString logMessage = wxString::Format("Performing operation: %d, Set System Environment Variable (Add)", i);
+                WriteToLog(logMessage);
+                size_t eqPos = command.Find('=');
+                if (eqPos != wxNOT_FOUND)
+                {
+                    wxString varName = command.SubString(0, eqPos - 1);
+                    wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+
+                    // Call the function to append the system environment variable (true for append)
+                    SetSystemEV(varName, varValue, true);
+                    WriteToLog("Successfully Set System Environment Variable (Add)");
+                }
+            }
+            else if (item.StartsWith("Set System Environment Variable (Replace): "))
+            {
+                // Extract the environment variable name and value after "Set System Environment Variable (Replace): "
+                wxString command = item.Mid(43).Trim();  // Length of the prefix "Set System Environment Variable (Replace): "
+                wxString logMessage = wxString::Format("Performing operation: %d, Set System Environment Variable (Replace)", i);
+                WriteToLog(logMessage);
+                size_t eqPos = command.Find('=');
+                if (eqPos != wxNOT_FOUND)
+                {
+                    wxString varName = command.SubString(0, eqPos - 1);
+                    wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+
+                    // Call the function to replace the system environment variable (false for replace)
+                    SetSystemEV(varName, varValue, false);
+                    WriteToLog("Successfully Set System Environment Variable (Replace)");
+                }
+            }
+            else if (item.StartsWith("CHECKPOINT: "))
+            {
+                // Extract the checkpoint message after "CHECKPOINT: "
+                wxString message = item.Mid(12);
+                wxString logMessage = wxString::Format("Performing operation: %d, CHECKPOINT", i);
+                WriteToLog(logMessage);
+
+                // Show a message dialog with a "Next" button to pause execution
+                wxDialog* checkpointDialog = new wxDialog(
+                    this, wxID_ANY, "Checkpoint", wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
+
+                // Add a vertical box sizer for layout
+                wxBoxSizer* vbox = new wxBoxSizer(wxVERTICAL);
+
+                // Add the message as a static text
+                wxStaticText* messageText = new wxStaticText(checkpointDialog, wxID_ANY, message);
+                vbox->Add(messageText, 1, wxALL | wxEXPAND, 10);
+
+                // Add a "Next" button
+                wxButton* nextButton = new wxButton(checkpointDialog, wxID_OK, "Next");
+                vbox->Add(nextButton, 0, wxALIGN_CENTER | wxALL, 10);
+
+                // Set the sizer for the dialog
+                checkpointDialog->SetSizerAndFit(vbox);
+                checkpointDialog->SetSize(wxSize(300, 200));
+
+                // Show the dialog and wait for the user to click "OK" (Next)
+                checkpointDialog->ShowModal();
+                delete checkpointDialog;  // Cleanup the dialog
+                WriteToLog("Successfully did CHECKPOINT");
+            }
+            else if (item == errorMarker)
+            {
+                // Remove the "Temp Error Point" since we're resuming from it
+                m_listBox->Delete(i);
+                WriteToLog("Resuming from Temp Error Point at index: " + wxString::Format("%d", i));
+                m_tempErrorPointIndex = -1;  // Reset the error point
+                m_errorFlag = false;
+                i--;
+                continue;
+            }
+            else
+            {
+                if (!item.IsEmpty()) {
+                    wxString logMessage = wxString::Format("Unknown command on step: %d, Name: %s", i, item);
+                    WriteToLog(logMessage);
+
+                    // Error
+                    m_errorFlag = true;
+                }
+
+            }
+
+            if (m_errorFlag)
+            {
+                WriteToLog("Encountered an error, adding Temp Error Point...");
+                m_listBox->Insert(errorMarker, i);
+                m_tempErrorPointIndex = i;
+                return;  // Stop processing and wait for the next call
             }
         }
-        else if (item.StartsWith("Set Environment Variable (Replace): "))
+        catch (const std::exception& e)
         {
-            // Extract the environment variable name and value after "Set Environment Variable (Replace): "
-            wxString command = item.Mid(36).Trim();
-            size_t eqPos = command.Find('=');
-            if (eqPos != wxNOT_FOUND)
+            // Log the error to file
+            wxString logMessage = wxString::Format("Error processing item: %d, Error: %s", i, e.what());
+            WriteToLog(logMessage);
+
+            wxMessageBox(wxString::Format("Error processing item %d: %s", i, e.what()), "Error", wxOK | wxICON_ERROR);
+
+            if (m_listBox->FindString(errorMarker) == wxNOT_FOUND)
             {
-                wxString varName = command.SubString(0, eqPos - 1);
-                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
-                SetEV(varName, varValue, false);  // Call to replace the environment variable
+                m_listBox->Insert(errorMarker, i);
+                m_tempErrorPointIndex = i;
+                m_errorFlag = true;
             }
+            break;
         }
-        else if (item.StartsWith("Set Environment Variable (Create): "))
-        {
-            // Extract the environment variable name and value after "Set Environment Variable (Create): "
-            wxString command = item.Mid(35).Trim();
-            size_t eqPos = command.Find('=');
-            if (eqPos != wxNOT_FOUND)
-            {
-                wxString varName = command.SubString(0, eqPos - 1);
-                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
-                SetEV(varName, varValue, true);  // Call to create the environment variable
-            }
-        }
-        else if (item.StartsWith("Set System Environment Variable (Add): "))
-        {
-            // Extract the environment variable name and value after "Set System Environment Variable (Add): "
-            wxString command = item.Mid(39).Trim();  // Length of the prefix "Set System Environment Variable (Add): "
-            size_t eqPos = command.Find('=');
-            if (eqPos != wxNOT_FOUND)
-            {
-                wxString varName = command.SubString(0, eqPos - 1);
-                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
+    }
 
-                // Call the function to append the system environment variable (true for append)
-                SetSystemEV(varName, varValue, true);
-            }
-        }
-        else if (item.StartsWith("Set System Environment Variable (Replace): "))
-        {
-            // Extract the environment variable name and value after "Set System Environment Variable (Replace): "
-            wxString command = item.Mid(43).Trim();  // Length of the prefix "Set System Environment Variable (Replace): "
-            size_t eqPos = command.Find('=');
-            if (eqPos != wxNOT_FOUND)
-            {
-                wxString varName = command.SubString(0, eqPos - 1);
-                wxString varValue = command.SubString(eqPos + 1, command.Length() - 1);
-
-                // Call the function to replace the system environment variable (false for replace)
-                SetSystemEV(varName, varValue, false);
-            }
-        }
-        else if (item.StartsWith("CHECKPOINT: "))
-        {
-            // Extract the checkpoint message after "CHECKPOINT: "
-            wxString message = item.Mid(12);
-
-            // Show a message dialog with a "Next" button to pause execution
-            wxDialog* checkpointDialog = new wxDialog(
-                this, wxID_ANY, "Checkpoint", wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER);
-
-            // Add a vertical box sizer for layout
-            wxBoxSizer* vbox = new wxBoxSizer(wxVERTICAL);
-
-            // Add the message as a static text
-            wxStaticText* messageText = new wxStaticText(checkpointDialog, wxID_ANY, message);
-            vbox->Add(messageText, 1, wxALL | wxEXPAND, 10);
-
-            // Add a "Next" button
-            wxButton* nextButton = new wxButton(checkpointDialog, wxID_OK, "Next");
-            vbox->Add(nextButton, 0, wxALIGN_CENTER | wxALL, 10);
-
-            // Set the sizer for the dialog
-            checkpointDialog->SetSizerAndFit(vbox);
-            checkpointDialog->SetSize(wxSize(300, 200));
-
-            // Show the dialog and wait for the user to click "OK" (Next)
-            checkpointDialog->ShowModal();
-            delete checkpointDialog;  // Cleanup the dialog
-        }
+    if (!m_errorFlag)
+    {
+        m_tempErrorPointIndex = -1;
+        WriteToLog("Script ended successfully.");
+    }
+    else
+    {
+        WriteToLog("Script ended with errors. Restart required.");
     }
 
     // Inform the user that the operations were executed

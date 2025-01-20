@@ -36,6 +36,9 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     choices.Add("Create File");
     choices.Add("Add/Edit Environment Variables");
     choices.Add("Add/Edit System Environment Variables");
+    choices.Add("Add/Edit Registry");
+    choices.Add("Map Network Drive");
+    choices.Add("Restart Computer");
     choices.Add("Checkpoint");
     m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
     vbox->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);  // Center horizontally, 10px from the top
@@ -313,7 +316,6 @@ wxString GetSystemPathVariable(const wxString& varName)
     return systemPathValue;
 }
 
-
 // Set or add an environment variable
 void cMain::SetEV(const wxString& varName, const wxString& varValue, bool append)
 {
@@ -401,6 +403,79 @@ void cMain::SetSystemEV(const wxString& varName, const wxString& varValue, bool 
 
     wxExecute(command);
     wxMessageBox("System environment variable updated successfully.", "Success", wxOK | wxICON_INFORMATION);
+}
+
+bool cMain::ModifyRegistry(const wxString& keyPath, const wxString& valueName, const wxString& valueData)
+{
+    HKEY hKey;
+    LONG result;
+
+    // Determine the registry root and subkey
+    wxString root, subKey;
+    if (keyPath.StartsWith("HKEY_LOCAL_MACHINE\\"))
+    {
+        root = "HKEY_LOCAL_MACHINE";
+        subKey = keyPath.Mid(18);
+        result = RegOpenKeyEx(HKEY_LOCAL_MACHINE, subKey.wc_str(), 0, KEY_SET_VALUE, &hKey);
+    }
+    else if (keyPath.StartsWith("HKEY_CURRENT_USER\\"))
+    {
+        root = "HKEY_CURRENT_USER";
+        subKey = keyPath.Mid(18);
+        result = RegOpenKeyEx(HKEY_CURRENT_USER, subKey.wc_str(), 0, KEY_SET_VALUE, &hKey);
+    }
+    else
+    {
+        wxMessageBox("Invalid registry root!", "Error", wxOK | wxICON_ERROR);
+        return false;
+    }
+
+    if (result == ERROR_SUCCESS)
+    {
+        // Convert wxString to wide string for Windows API
+        std::wstring wideValueName = valueName.ToStdWstring();
+        std::wstring wideValueData = valueData.ToStdWstring();
+
+        result = RegSetValueEx(hKey, wideValueName.c_str(), 0, REG_SZ,
+            (BYTE*)wideValueData.c_str(),
+            (wideValueData.length() + 1) * sizeof(wchar_t));
+
+        RegCloseKey(hKey);
+
+        if (result == ERROR_SUCCESS)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool cMain::MapNetworkDrive(const wxString& driveLetter, const wxString& networkPath, const wxString& persistentFlag)
+{
+    // Ensure parameters are valid
+    if (driveLetter.IsEmpty() || networkPath.IsEmpty())
+    {
+        wxMessageBox("Drive letter or network path cannot be empty!", "Error", wxOK | wxICON_ERROR);
+        return false;
+    }
+
+    // Construct the net use command
+    wxString command = "net use " + driveLetter + " " + networkPath + " " + persistentFlag;
+
+    // Execute the command
+    int result = wxExecute(command, wxEXEC_SYNC);
+
+    // Check execution result
+    if (result == 0)
+    {
+        return true;  // Successfully mapped the drive
+    }
+    else
+    {
+        wxMessageBox("Failed to map network drive: " + networkPath, "Error", wxOK | wxICON_ERROR);
+        return false;
+    }
 }
 
 void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
@@ -691,7 +766,132 @@ void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
                     }
                 }
             }
+            else if (selectedOption == "Add/Edit Registry")
+            {
+                wxTextEntryDialog keyDialog(
+                    this,
+                    "Enter the registry key path (e.g., HKEY_CURRENT_USER\\Software\\MyApp):",
+                    "Registry Key Path",
+                    "",
+                    wxOK | wxCANCEL);
+
+                if (keyDialog.ShowModal() == wxID_OK)
+                {
+                    wxString regKeyPath = keyDialog.GetValue().Trim();
+
+                    if (!regKeyPath.IsEmpty())
+                    {
+                        wxTextEntryDialog valueDialog(
+                            this,
+                            "Enter the registry value name (e.g., SettingName):",
+                            "Registry Value Name",
+                            "",
+                            wxOK | wxCANCEL);
+
+                        if (valueDialog.ShowModal() == wxID_OK)
+                        {
+                            wxString regValueName = valueDialog.GetValue().Trim();
+
+                            if (!regValueName.IsEmpty())
+                            {
+                                wxTextEntryDialog dataDialog(
+                                    this,
+                                    "Enter the value to store in the registry:",
+                                    "Registry Value Data",
+                                    "",
+                                    wxOK | wxCANCEL);
+
+                                if (dataDialog.ShowModal() == wxID_OK)
+                                {
+                                    wxString regValueData = dataDialog.GetValue().Trim();
+
+                                    if (!regValueData.IsEmpty())
+                                    {
+                                        // Append registry modification command to listbox
+                                        m_listBox->SetString(selectedIndex,
+                                            "Registry: \"" + regKeyPath + "\" \"" + regValueName + "\" \"" + regValueData + "\"");
+                                    }
+                                    else
+                                    {
+                                        wxMessageBox("Registry value data cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                wxMessageBox("Registry value name cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        wxMessageBox("Registry key path cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                    }
+                }
+                }
+            else if (selectedOption == "Map Network Drive")
+            {
+                wxTextEntryDialog driveLetterDialog(
+                    this,
+                    "Enter the drive letter (e.g., Z:):",
+                    "Drive Letter",
+                    "",
+                    wxOK | wxCANCEL);
+
+                if (driveLetterDialog.ShowModal() == wxID_OK)
+                {
+                    wxString driveLetter = driveLetterDialog.GetValue().Trim();
+
+                    // Ensure drive letter ends with a colon (:)
+                    if (!driveLetter.IsEmpty() && driveLetter.EndsWith(":"))
+                    {
+                        wxTextEntryDialog networkPathDialog(
+                            this,
+                            "Enter the network path (e.g., \\\\server\\sharedfolder):",
+                            "Network Path",
+                            "",
+                            wxOK | wxCANCEL);
+
+                        if (networkPathDialog.ShowModal() == wxID_OK)
+                        {
+                            wxString networkPath = networkPathDialog.GetValue().Trim();
+
+                            if (!networkPath.IsEmpty())
+                            {
+                                wxMessageDialog persistentDialog(
+                                    this,
+                                    "Do you want this drive mapping to be persistent (reconnect at login)?",
+                                    "Persistent Mapping",
+                                    wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+                                int persistentChoice = persistentDialog.ShowModal();
+
+                                wxString persistentFlag = (persistentChoice == wxYES) ? "/PERSISTENT:YES" : "/PERSISTENT:NO";
+
+                                // Format the final command for display in the list box
+                                m_listBox->SetString(selectedIndex,
+                                    "Map Drive: " + driveLetter + " -> " + networkPath + " " + persistentFlag);
+                            }
+                            else
+                            {
+                                wxMessageBox("Network path cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        wxMessageBox("Invalid drive letter format! Please include the colon (:)", "Error", wxOK | wxICON_ERROR);
+                    }
+                }
+                }
+            else if (selectedOption == "Restart Computer")
+            {
+
+                // Add restart command to list box
+                m_listBox->SetString(selectedIndex, "Restart Computer");
+                }
         }
+
         else
         {
             // Update with manually entered value
@@ -702,7 +902,6 @@ void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
         }
     }
 }
-
 
 void cMain::OnDeleteButtonClicked(wxCommandEvent& evt)
 {
@@ -1078,6 +1277,127 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             }
         }
     }
+    else if (selectedOption == "Add/Edit Registry")
+    {
+        wxTextEntryDialog keyDialog(
+            this,
+            "Enter the registry key path (e.g., HKEY_CURRENT_USER\\Software\\MyApp):",
+            "Registry Key Path",
+            "",
+            wxOK | wxCANCEL);
+
+        if (keyDialog.ShowModal() == wxID_OK)
+        {
+            wxString regKeyPath = keyDialog.GetValue().Trim();
+
+            if (!regKeyPath.IsEmpty())
+            {
+                wxTextEntryDialog valueDialog(
+                    this,
+                    "Enter the registry value name (e.g., SettingName):",
+                    "Registry Value Name",
+                    "",
+                    wxOK | wxCANCEL);
+
+                if (valueDialog.ShowModal() == wxID_OK)
+                {
+                    wxString regValueName = valueDialog.GetValue().Trim();
+
+                    if (!regValueName.IsEmpty())
+                    {
+                        wxTextEntryDialog dataDialog(
+                            this,
+                            "Enter the value to store in the registry:",
+                            "Registry Value Data",
+                            "",
+                            wxOK | wxCANCEL);
+
+                        if (dataDialog.ShowModal() == wxID_OK)
+                        {
+                            wxString regValueData = dataDialog.GetValue().Trim();
+
+                            if (!regValueData.IsEmpty())
+                            {
+                                // Append registry modification command to listbox
+                                m_listBox->AppendString("Registry: \"" + regKeyPath + "\" \"" + regValueName + "\" \"" + regValueData + "\"");
+                            }
+                            else
+                            {
+                                wxMessageBox("Registry value data cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        wxMessageBox("Registry value name cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                    }
+                }
+            }
+            else
+            {
+                wxMessageBox("Registry key path cannot be empty!", "Error", wxOK | wxICON_ERROR);
+            }
+        }
+    }
+    else if (selectedOption == "Map Network Drive")
+    {
+        wxTextEntryDialog driveLetterDialog(
+            this,
+            "Enter the drive letter (e.g., Z:):",
+            "Drive Letter",
+            "",
+            wxOK | wxCANCEL);
+
+        if (driveLetterDialog.ShowModal() == wxID_OK)
+        {
+            wxString driveLetter = driveLetterDialog.GetValue().Trim();
+
+            // Ensure drive letter ends with a colon (:)
+            if (!driveLetter.IsEmpty() && driveLetter.EndsWith(":"))
+            {
+                wxTextEntryDialog networkPathDialog(
+                    this,
+                    "Enter the network path (e.g., \\\\server\\sharedfolder):",
+                    "Network Path",
+                    "",
+                    wxOK | wxCANCEL);
+
+                if (networkPathDialog.ShowModal() == wxID_OK)
+                {
+                    wxString networkPath = networkPathDialog.GetValue().Trim();
+
+                    if (!networkPath.IsEmpty())
+                    {
+                        wxMessageDialog persistentDialog(
+                            this,
+                            "Do you want this drive mapping to be persistent (reconnect at login)?",
+                            "Persistent Mapping",
+                            wxYES_NO | wxCANCEL | wxICON_QUESTION);
+
+                        int persistentChoice = persistentDialog.ShowModal();
+
+                        wxString persistentFlag = (persistentChoice == wxYES) ? "/PERSISTENT:YES" : "/PERSISTENT:NO";
+
+                        // Format the final command for display in the list box
+                        m_listBox->AppendString("Map Drive: " + driveLetter + " -> " + networkPath + " " + persistentFlag);
+                    }
+                    else
+                    {
+                        wxMessageBox("Network path cannot be empty!", "Error", wxOK | wxICON_ERROR);
+                    }
+                }
+            }
+            else
+            {
+                wxMessageBox("Invalid drive letter format! Please include the colon (:)", "Error", wxOK | wxICON_ERROR);
+            }
+        }
+    }
+    else if (selectedOption == "Restart Computer")
+    {
+        // Add restart command to list box
+        m_listBox->AppendString("Restart Computer");
+    }
     else
     {
         // For other options, just add the option name to the list box
@@ -1270,18 +1590,37 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
     WriteToLog("Script started successfully.");
 
     wxString errorMarker = "Temp Restart Error Point (do not edit)";
+    wxString restartMarker = "TEMP Restart";
 
+    // Reset global variables
+    m_tempErrorPointIndex = -1;
+    m_tempRestartIndex = -1;
+
+    // Loop through the list box to find the markers
     for (unsigned int i = 0; i < m_listBox->GetCount(); i++)
     {
-        if (m_listBox->GetString(i) == errorMarker)
+        wxString item = m_listBox->GetString(i);
+
+        if (item == errorMarker)
         {
-            m_tempErrorPointIndex = i;
-            break;
+            m_tempErrorPointIndex = i;  // Store error marker index
+        }
+        else if (item == restartMarker)
+        {
+            m_tempRestartIndex = i;  // Store restart marker index
         }
     }
 
-    // Determine the starting point: use the error point if it exists, else start from the beginning
-    unsigned int startIndex = (m_tempErrorPointIndex != -1) ? m_tempErrorPointIndex : 0;
+    // Determine the starting point based on found indices
+    unsigned int startIndex = 0;
+    if (m_tempErrorPointIndex != -1)
+    {
+        startIndex = m_tempErrorPointIndex;
+    }
+    else if (m_tempRestartIndex != -1)
+    {
+        startIndex = m_tempRestartIndex;
+    }
 
     // Iterate over the items in the list box and execute actions directly
     for (unsigned int i = startIndex; i < m_listBox->GetCount(); i++)
@@ -1454,6 +1793,95 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
                 checkpointDialog->ShowModal();
                 delete checkpointDialog;  // Cleanup the dialog
                 WriteToLog("Successfully did CHECKPOINT");
+            }
+            else if (item.StartsWith("Registry: "))
+            {
+                // Ex usage: Registry: "HKEY_CURRENT_USER\\Software\\MyApp" "MySetting" "NewValue"
+                // Remove the "Registry: " prefix (10 characters)
+                item = item.Mid(10).Trim();
+
+                wxString logMessage = wxString::Format("Performing operation: %d, Modify Registry", i);
+                WriteToLog(logMessage);
+
+                // Extract the registry key, value name, and data
+                wxString regKeyPath = item.BeforeFirst('\"').Trim(false).Trim(true);  // Remove surrounding spaces
+                item = item.Mid(regKeyPath.Len() + 3);  // Move past the first quote
+
+                wxString regValueName = item.BeforeFirst('\"').Trim(false).Trim(true);
+                item = item.Mid(regValueName.Len() + 3);  // Move past the second quote
+
+                wxString regValueData = item.BeforeFirst('\"').Trim(false).Trim(true);
+
+                // Perform registry modification
+                if (ModifyRegistry(regKeyPath, regValueName, regValueData))
+                {
+                    WriteToLog("Registry key successfully modified: " + regKeyPath);
+                }
+                else
+                {
+                    WriteToLog("Failed to modify registry key: " + regKeyPath);
+                    m_errorFlag = true;  // Flag error for progress tracking
+                }
+            }
+            else if (item.StartsWith("Map Network Drive: "))
+            {
+                // Remove the "Map Network Drive: " prefix (20 characters)
+                item = item.Mid(19).Trim();
+
+                wxString logMessage = wxString::Format("Performing operation: %d, Map Network Drive", i);
+                WriteToLog(logMessage);
+
+                // Extract drive letter
+                wxString driveLetter = item.BeforeFirst('\"').Trim(false).Trim(true);
+                item = item.Mid(driveLetter.Len() + 3);  // Move past the first quote and space
+
+                // Extract network path
+                wxString networkPath = item.BeforeFirst('\"').Trim(false).Trim(true);
+                item = item.Mid(networkPath.Len() + 3);  // Move past the second quote and space
+
+                // Extract persistence option
+                wxString persistentFlag = item.Trim(false).Trim(true);
+
+                // Call function to map the network drive
+                if (MapNetworkDrive(driveLetter, networkPath, persistentFlag))
+                {
+                    WriteToLog("Network drive mapped successfully: " + driveLetter + " -> " + networkPath);
+                }
+                else
+                {
+                    WriteToLog("Failed to map network drive: " + driveLetter);
+                    m_errorFlag = true;  // Flag error for progress tracking
+                }
+            }
+            else if (item == "Restart Computer")
+            {
+                wxString logMessage = wxString::Format("Performing operation: %d, Restarting Computer", i);
+                WriteToLog(logMessage);
+
+                // Run script from this point on after restart
+                m_listBox->Insert(restartMarker, i);
+
+                // Save the current step file before reboot
+                wxCommandEvent dummyEvent;
+                OnSaveListboxClicked(dummyEvent);
+
+                wxMessageBox("The computer will now restart.", "Restarting", wxOK | wxICON_INFORMATION);
+
+                // Issue restart command in 5 seconds
+                wxExecute("shutdown /r /t 5");
+
+                break;  // Stop further execution, system is restarting
+            }
+            else if (item == restartMarker)
+            {
+                m_listBox->Delete(i);
+                wxString logMessage = wxString::Format("Resuming script from step: %d after restart", i + 1);
+                WriteToLog(logMessage);
+                m_tempRestartIndex = -1;  // Reset the restart point
+                i--;
+                continue;
+               
+
             }
             else if (item == errorMarker)
             {

@@ -13,6 +13,7 @@ private:
 	int m_draggedIndex = wxNOT_FOUND;
 	wxString m_scriptDirectory;
 	int m_tempErrorPointIndex = -1;  // Stores the index of the error point, -1 means no error
+	int m_tempRestartIndex = -1;
 	bool m_errorFlag = false;
 
 public:
@@ -50,6 +51,8 @@ public:
 	void CreateFiles(const wxString& filePath);
 	void SetEV(const wxString& varName, const wxString& varValue, bool append);
 	void SetSystemEV(const wxString& varName, const wxString& varValue, bool append);
+	bool ModifyRegistry(const wxString& keyPath, const wxString& valueName, const wxString& valueData);
+	bool MapNetworkDrive(const wxString& driveLetter, const wxString& networkPath, const wxString& persistentFlag);
 
 	wxDECLARE_EVENT_TABLE();
 };

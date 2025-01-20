@@ -27,6 +27,7 @@ public:
 	wxButton* m_btnDelete = nullptr;
 	wxButton* m_btnSaveListbox = nullptr;
 	wxButton* m_btnOpenListbox = nullptr;
+	wxButton* m_btnClearAll = nullptr;
 	wxString m_selectedFilePath;
 	wxArrayString choices;
 
@@ -35,6 +36,7 @@ public:
 	void OnSaveListboxClicked(wxCommandEvent& evt);
 	void OnOpenListboxClicked(wxCommandEvent& evt);
 	void OnDeleteButtonClicked(wxCommandEvent& evt);
+	void OnClearAllButtonClicked(wxCommandEvent& evt);
 	void OnListBoxDoubleClick(wxCommandEvent& evt);
 	void OnListBoxMouseDown(wxMouseEvent& event);
 	void OnListBoxMouseMove(wxMouseEvent& event);

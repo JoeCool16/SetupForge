@@ -18,6 +18,7 @@ wxBEGIN_EVENT_TABLE(cMain, wxFrame)
     EVT_BUTTON(1003, OnSaveListboxClicked)
     EVT_BUTTON(1004, OnOpenListboxClicked)
     EVT_BUTTON(1005, OnDeleteButtonClicked)
+    EVT_BUTTON(1006, OnClearAllButtonClicked)
 wxEND_EVENT_TABLE()
 
 cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSize(800, 600))
@@ -58,7 +59,7 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     hboxButtons->Add(m_stepLabel, 0, wxALIGN_CENTER_VERTICAL);  // Align label to the center
 
     // Progress Bar
-    m_progressBar = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(300, 25));
+    m_progressBar = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(400, 25));
     hboxButtons->Add(m_progressBar, 1, wxALIGN_CENTER_VERTICAL);
 
     // Add another flexible spacer after the progress bar (optional)
@@ -67,9 +68,29 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     // Add the horizontal sizer to the main vertical sizer
     vbox->Add(hboxButtons, 0, wxEXPAND | wxTOP, 10);
 
+    // Create a horizontal sizer for layout
+    wxBoxSizer* hboxMain = new wxBoxSizer(wxHORIZONTAL);
+
+    // Create a vertical sizer for the left-side buttons (aligning with + and -)
+    wxBoxSizer* vboxLeftSide = new wxBoxSizer(wxVERTICAL);
+
+    // Add some top padding to align vertically with the list box
+    vboxLeftSide->AddStretchSpacer();
+
+    // Add the Clear All button to the vertical sizer with no left padding
+    m_btnClearAll = new wxButton(this, 1006, "Clear All", wxDefaultPosition, wxSize(100, 30));
+    vboxLeftSide->Add(m_btnClearAll, 0, wxALIGN_LEFT | wxLEFT, 0);  // Align to the left
+
+    // Add vertical sizer to the main horizontal layout
+    hboxMain->Add(vboxLeftSide, 0, wxALIGN_LEFT | wxTOP, 10);  // Keep it flush left
+
     // Middle box (wxListBox) to display selected options
     m_listBox = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(500, 300));
-    vbox->Add(m_listBox, 1, wxALIGN_CENTER | wxALL, 10);  // Expandable and centered
+    hboxMain->Add(m_listBox, 1, wxEXPAND | wxALL, 10);  // Expand list box without alignment
+
+    // Add the horizontal sizer to the main vertical layout
+    vbox->Add(hboxMain, 0, wxEXPAND | wxALL, 10);
+
 
     m_listBox->Bind(wxEVT_LISTBOX_DCLICK, &cMain::OnListBoxDoubleClick, this);
     m_listBox->Bind(wxEVT_LEFT_DOWN, &cMain::OnListBoxMouseDown, this);
@@ -697,6 +718,28 @@ void cMain::OnDeleteButtonClicked(wxCommandEvent& evt)
     {
         // If no item is selected, show a message box
         wxMessageBox("Please select an item to delete.", "No Selection", wxOK | wxICON_WARNING);
+    }
+
+    evt.Skip();
+}
+
+void cMain::OnClearAllButtonClicked(wxCommandEvent& evt)
+{
+    if (m_listBox->GetCount() > 0)  // Check if list box is not empty
+    {
+        int confirm = wxMessageBox(
+            "Are you sure you want to clear all items?",
+            "Confirm Clear All",
+            wxYES_NO | wxICON_QUESTION);
+
+        if (confirm == wxYES)
+        {
+            m_listBox->Clear();  // Remove all items from the list box
+        }
+    }
+    else
+    {
+        wxMessageBox("The list is already empty.", "Info", wxOK | wxICON_INFORMATION);
     }
 
     evt.Skip();

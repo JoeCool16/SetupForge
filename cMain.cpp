@@ -27,9 +27,26 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     appIcon.LoadFile("app_icon.ico", wxBITMAP_TYPE_ICO);
     SetIcon(appIcon);
 
+    // Main Vertical Box Sizer
     wxBoxSizer* vbox = new wxBoxSizer(wxVERTICAL);
 
-    // Dropdown (wxChoice) to select options
+    // Progress Bar and Step Label (at the top of the window)
+    wxBoxSizer* hboxButtons = new wxBoxSizer(wxHORIZONTAL);
+    hboxButtons->AddStretchSpacer(1);  // Push everything after this to the right
+    m_stepLabel = new wxStaticText(this, wxID_ANY, "Step: 0 out of 0", wxDefaultPosition, wxDefaultSize);
+    hboxButtons->Add(m_stepLabel, 0, wxALIGN_CENTER_VERTICAL);  // Align label to the center
+    m_progressBar = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(400, 25));
+    hboxButtons->Add(m_progressBar, 1, wxALIGN_CENTER_VERTICAL);
+    hboxButtons->AddStretchSpacer(1);
+    vbox->Add(hboxButtons, 0, wxEXPAND | wxTOP, 10);
+
+    // Main Horizontal Sizer (for the two sections: Left and Right)
+    wxBoxSizer* hboxMain = new wxBoxSizer(wxHORIZONTAL);
+
+    // Left Section: Vertical Sizer for Buttons
+    wxBoxSizer* vboxLeftSide = new wxBoxSizer(wxVERTICAL);
+
+    // Choice Dropdown
     choices.Add("Run an Exe");
     choices.Add("Insert File");
     choices.Add("Create Folder");
@@ -40,92 +57,60 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     choices.Add("Map Network Drive");
     choices.Add("Restart Computer");
     choices.Add("Checkpoint");
-    m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
-    vbox->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);  // Center horizontally, 10px from the top
 
-    // Create a horizontal sizer for the buttons and progress bar
-    wxBoxSizer* hboxButtons = new wxBoxSizer(wxHORIZONTAL);
+    m_choice = new wxChoice(this, wxID_ANY, wxDefaultPosition, wxSize(150, 30), choices);
+    vboxLeftSide->Add(m_choice, 0, wxALIGN_LEFT | wxTOP, 10);
 
     // "+" Button to add the selected option to the list
     m_btnAdd = new wxButton(this, 1001, "+", wxDefaultPosition, wxSize(50, 30));
-    hboxButtons->Add(m_btnAdd, 0, wxRIGHT, 10);  // Add 10px of space to the right of "+"
+    vboxLeftSide->Add(m_btnAdd, 0, wxALIGN_LEFT | wxTOP, 10);
 
     // "-" Button to delete the selected option
     m_btnDelete = new wxButton(this, 1005, "-", wxDefaultPosition, wxSize(50, 30));
-    hboxButtons->Add(m_btnDelete, 0, wxRIGHT, 10);  // Add 10px of space to the right of "-"
+    vboxLeftSide->Add(m_btnDelete, 0, wxALIGN_LEFT | wxTOP, 10);
 
-    // Add a flexible spacer to push the progress bar to the center
-    hboxButtons->AddStretchSpacer(1);  // Push everything after this to the right
-
-    // Step label right next to the progress bar
-    m_stepLabel = new wxStaticText(this, wxID_ANY, "Step: 0 out of 0", wxDefaultPosition, wxDefaultSize);
-    hboxButtons->Add(m_stepLabel, 0, wxALIGN_CENTER_VERTICAL);  // Align label to the center
-
-    // Progress Bar
-    m_progressBar = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(400, 25));
-    hboxButtons->Add(m_progressBar, 1, wxALIGN_CENTER_VERTICAL);
-
-    // Add another flexible spacer after the progress bar (optional)
-    hboxButtons->AddStretchSpacer(1);  // Ensure symmetry, but this is optional
-
-    // Add the horizontal sizer to the main vertical sizer
-    vbox->Add(hboxButtons, 0, wxEXPAND | wxTOP, 10);
-
-    // Create a horizontal sizer for layout
-    wxBoxSizer* hboxMain = new wxBoxSizer(wxHORIZONTAL);
-
-    // Create a vertical sizer for the left-side buttons (aligning with + and -)
-    wxBoxSizer* vboxLeftSide = new wxBoxSizer(wxVERTICAL);
-
-    // Add some top padding to align vertically with the list box
-    vboxLeftSide->AddStretchSpacer();
-
-    // Add the Clear All button to the vertical sizer with no left padding
+    // Clear All Button
     m_btnClearAll = new wxButton(this, 1006, "Clear All", wxDefaultPosition, wxSize(100, 30));
-    vboxLeftSide->Add(m_btnClearAll, 0, wxALIGN_LEFT | wxLEFT, 0);  // Align to the left
+    vboxLeftSide->Add(m_btnClearAll, 0, wxALIGN_LEFT | wxTOP, 10);
 
-    // Add vertical sizer to the main horizontal layout
-    hboxMain->Add(vboxLeftSide, 0, wxALIGN_LEFT | wxTOP, 10);  // Keep it flush left
+    // Right Section: Vertical Sizer for ListBox and Buttons
+    wxBoxSizer* vboxRightSide = new wxBoxSizer(wxVERTICAL);
 
-    // Middle box (wxListBox) to display selected options
+    // ListBox to display selected options
     m_listBox = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(500, 300));
-    hboxMain->Add(m_listBox, 1, wxEXPAND | wxALL, 10);  // Expand list box without alignment
+    vboxRightSide->Add(m_listBox, 0, wxEXPAND | wxALL, 10);
 
-    // Add the horizontal sizer to the main vertical layout
-    vbox->Add(hboxMain, 0, wxEXPAND | wxALL, 10);
-
-
-    m_listBox->Bind(wxEVT_LISTBOX_DCLICK, &cMain::OnListBoxDoubleClick, this);
-    m_listBox->Bind(wxEVT_LEFT_DOWN, &cMain::OnListBoxMouseDown, this);
-    m_listBox->Bind(wxEVT_MOTION, &cMain::OnListBoxMouseMove, this);
-    m_listBox->Bind(wxEVT_LEFT_UP, &cMain::OnListBoxMouseUp, this);
-
-    // Box to hold the buttons for saving and opening listbox files
+    // File Buttons (Save and Open Step File)
     wxBoxSizer* fileBox = new wxBoxSizer(wxHORIZONTAL);
-
-    // Save Step File Button
     m_btnSaveListbox = new wxButton(this, 1003, "Save Step File", wxDefaultPosition, wxSize(100, 30));
     fileBox->Add(m_btnSaveListbox, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT, 5);
-
-    // Open Step File Button
     m_btnOpenListbox = new wxButton(this, 1004, "Open Step File", wxDefaultPosition, wxSize(100, 30));
     fileBox->Add(m_btnOpenListbox, 0, wxALIGN_CENTER_VERTICAL);
-
-    vbox->Add(fileBox, 0, wxALIGN_CENTER | wxTOP, 10);  // Add fileBox above Run Steps button
-
-    // Horizontal sizer for Run Steps Button and Textbox
-    wxBoxSizer* saveBox = new wxBoxSizer(wxHORIZONTAL);
+    vboxRightSide->Add(fileBox, 0, wxALIGN_CENTER | wxTOP, 10);
 
     // Run Steps Button
+    wxBoxSizer* saveBox = new wxBoxSizer(wxHORIZONTAL);
     m_btnSave = new wxButton(this, 1002, "Run Steps", wxDefaultPosition, wxSize(100, 30));
     saveBox->Add(m_btnSave, 0, wxALIGN_CENTER_VERTICAL);
+    vboxRightSide->Add(saveBox, 0, wxALIGN_CENTER | wxTOP, 10);
 
-    vbox->Add(saveBox, 0, wxALIGN_CENTER | wxTOP, 10);  // Below the fileBox
+    // Add both left and right sizers to the main horizontal sizer
+    hboxMain->Add(vboxLeftSide, 0, wxALIGN_TOP | wxRIGHT, 10);  // Left side with right margin
+    hboxMain->Add(vboxRightSide, 1, wxEXPAND);  // Right side with flexible expansion
+
+    // Add the horizontal sizer to the main vertical layout
+    vbox->Add(hboxMain, 1, wxEXPAND | wxALL, 10);
 
     // Set the sizer for the frame
     this->SetSizer(vbox);
 
+    // Bind events for listbox interactions
+    m_listBox->Bind(wxEVT_LISTBOX_DCLICK, &cMain::OnListBoxDoubleClick, this);
+    m_listBox->Bind(wxEVT_LEFT_DOWN, &cMain::OnListBoxMouseDown, this);
+    m_listBox->Bind(wxEVT_MOTION, &cMain::OnListBoxMouseMove, this);
+    m_listBox->Bind(wxEVT_LEFT_UP, &cMain::OnListBoxMouseUp, this);
 }
+
 
 cMain::~cMain()
 {

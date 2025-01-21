@@ -225,7 +225,8 @@ void cMain::FileMover(const wxString& sourcePath, const wxString& destinationPat
 {
     if (wxCopyFile(sourcePath, destinationPath))
     {
-        m_listBox->AppendString("Moved: " + sourcePath + " to " + destinationPath);
+        //m_listBox->AppendString("Moved: " + sourcePath + " to " + destinationPath);
+        return;
     }
     else
     {
@@ -480,6 +481,12 @@ bool cMain::MapNetworkDrive(const wxString& driveLetter, const wxString& network
 
 void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
 {
+
+    // Get the standard paths to create the results folder
+    wxString resultsPath = wxStandardPaths::Get().GetExecutablePath();
+    wxFileName exePath(resultsPath);
+    wxString resultsDir = exePath.GetPath() + "\\results\\";
+
     // Get the index of the selected item
     int selectedIndex = m_listBox->GetSelection();
     if (selectedIndex == wxNOT_FOUND) return; // No item is selected
@@ -533,6 +540,14 @@ void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
                 if (openFileDialog.ShowModal() == wxID_OK)
                 {
                     wxString filePath = openFileDialog.GetPath();
+                    if (filePath.StartsWith(resultsDir))
+                    {
+                        filePath = filePath.erase(0, resultsDir.length() - 1);
+                    }
+                    else
+                    {
+                        wxMessageBox("File paths outside of \"\\results\\\" folder may differ across machines", "WARNING", wxOK | wxICON_WARNING);
+                    }
                     m_listBox->SetString(selectedIndex, "Run .exe: " + filePath);
                 }
             }
@@ -551,6 +566,15 @@ void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
                     wxString sourcePath = sourceFileDialog.GetPath();
                     wxFileName sourceFile(sourcePath);
                     wxString fileName = sourceFile.GetFullName();
+
+                    if (sourcePath.StartsWith(resultsDir))
+                    {
+                        sourcePath = sourcePath.erase(0, resultsDir.length() - 1);
+                    }
+                    else
+                    {
+                        wxMessageBox("File paths outside of \"\\results\\\" folder may differ across machines", "WARNING", wxOK | wxICON_WARNING);
+                    }
 
                     wxDirDialog destinationDirDialog(
                         this,
@@ -970,8 +994,14 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
         {
             wxString filePath = openFileDialog.GetPath();
 
-            // Save the file path (you can use it elsewhere in your program)
-            m_selectedFilePath = filePath;
+            if (filePath.StartsWith(resultsDir))
+            {
+                filePath = filePath.erase(0, resultsDir.length() - 1);
+            }
+            else 
+            {
+                wxMessageBox("File paths outside of \"\\results\\\" folder may differ across machines", "WARNING", wxOK | wxICON_WARNING);
+            }
 
             // Add the file path to the list box
             m_listBox->AppendString("Run .exe: " + filePath);
@@ -995,6 +1025,15 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
             // Extract the file name from the source path
             wxFileName sourceFile(sourcePath);
             wxString fileName = sourceFile.GetFullName();  // This gives just the file name (including extension)
+
+            if (sourcePath.StartsWith(resultsDir))
+            {
+                sourcePath = sourcePath.erase(0, resultsDir.length() - 1);
+            }
+            else
+            {
+                wxMessageBox("File paths outside of \"\\results\\\" folder may differ across machines", "WARNING", wxOK | wxICON_WARNING);
+            }
 
             // File dialog for selecting the destination folder
             wxDirDialog destinationDirDialog(
@@ -1622,6 +1661,11 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
         startIndex = m_tempRestartIndex;
     }
 
+    // Get the standard paths to create the results folder
+    wxString resultsPath = wxStandardPaths::Get().GetExecutablePath();
+    wxFileName exePath(resultsPath);
+    wxString resultsDir = exePath.GetPath() + "\\results";
+
     // Iterate over the items in the list box and execute actions directly
     for (unsigned int i = startIndex; i < m_listBox->GetCount(); i++)
     {
@@ -1637,10 +1681,14 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
             if (item.StartsWith("Run .exe: "))
             {
                 // Extract the path after "Run .exe: "
-                wxString exePath = item.Mid(10).Trim();
-                wxString logMessage = wxString::Format("Performing operation: %d, Run .exe for path: %s", i, exePath);
+                wxString exePath2 = item.Mid(10).Trim();
+                if (exePath2.substr(0, 1) == "\\") {  //Check if a partial path
+                    exePath2 = resultsDir + exePath2;
+                    OutputDebugString(exePath2);
+                }
+                wxString logMessage = wxString::Format("Performing operation: %d, Run .exe for path: %s", i, exePath2);
                 WriteToLog(logMessage);
-                RunExe(exePath);  // Call the function to run the executable
+                RunExe(exePath2);  // Call the function to run the executable
                 WriteToLog("Successfully ran .exe");
             }
             else if (item.StartsWith("Move: "))
@@ -1658,6 +1706,11 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
                 wxString second_path = item.Mid(first_path.Len() + 3);  // Skip past the first quote and path
 
                 second_path = second_path.BeforeFirst('\"');  // Extract everything before the next quote
+
+                if (first_path.substr(0, 1) == "\\") {  //Check if a partial path
+                    first_path = resultsDir + first_path;
+                }
+                OutputDebugString(first_path + "\n" + second_path + "\n");
 
                 FileMover(first_path, second_path);
                 WriteToLog("Successfully moved files");

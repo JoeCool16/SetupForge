@@ -49,8 +49,9 @@ cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSi
     // Choice Dropdown
     choices.Add("Run an Exe");
     choices.Add("Insert File");
-    choices.Add("Create Folder");
+    choices.Add("Insert Folder");
     choices.Add("Create File");
+    choices.Add("Create Folder");
     choices.Add("Add/Edit Environment Variables");
     choices.Add("Add/Edit System Environment Variables");
     choices.Add("Add/Edit Registry");
@@ -221,6 +222,124 @@ void cMain::FileMover(const wxString& sourcePath, const wxString& destinationPat
 
     }
 }
+
+bool cMain::DeleteFolderRecursively(const wxString& folderPath)
+{
+    OutputDebugString(L"HERE2-----------------\n");
+    wxDir dir(folderPath);
+    if (!dir.IsOpened()) {
+        return false;  // Unable to open the directory
+    }
+
+    wxString fileName;
+    bool moreFiles = dir.GetFirst(&fileName, "", wxDIR_FILES | wxDIR_DIRS);
+
+    while (moreFiles)
+    {
+        wxString fullPath = folderPath + "\\" + fileName;
+
+        if (wxDir::Exists(fullPath)) {
+            // If it's a directory, call DeleteFolderRecursively to delete it
+            if (!DeleteFolderRecursively(fullPath)) {
+                return false;  // Failed to delete subfolder
+            }
+        }
+        else {
+            // If it's a file, delete it
+            if (!wxRemoveFile(fullPath)) {
+                return false;  // Failed to delete file
+            }
+        }
+
+        moreFiles = dir.GetNext(&fileName);  // Get the next file/subfolder
+    }
+
+    // Once all contents are deleted, remove the directory itself
+    return wxRmdir(folderPath);  // Remove the folder
+}
+
+// Move a folder
+void cMain::FolderMover(const wxString& sourcePath, const wxString& destinationPath)
+{
+
+    // Ensure source and destination paths have a trailing backslash
+    wxString sourcePath2 = sourcePath;
+    if (!sourcePath2.EndsWith("\\"))
+        sourcePath2 += "\\";
+
+    wxString destinationPath2 = destinationPath;
+    if (!destinationPath2.EndsWith("\\"))
+        destinationPath2 += "\\";
+
+    // Extract the folder name from the source path
+    wxFileName sourceDir(sourcePath);
+    wxString folderName = sourceDir.GetFullName();  // Get the folder name of the source folder
+
+    // Destination folder should be the folderName inside destinationPath
+    wxString finalDestinationPath = destinationPath2 + folderName;
+
+    // Check if the source path exists and is a directory
+    if (wxDir::Exists(sourcePath2))
+    {
+        OutputDebugString(L"Source path exists and is a directory \n");
+
+        wxDir dir(sourcePath2);
+        if (!dir.IsOpened())
+        {
+            m_errorFlag = true;
+            WriteToLog("Failed to open source directory: " + sourcePath2);
+            wxMessageBox("Failed to open the source directory!", "Error", wxOK | wxICON_ERROR);
+            return;
+        }
+
+        // Ensure the destination folder (which will be the same name as the source folder) exists or create it
+        if (!wxDir::Exists(finalDestinationPath) && !wxMkdir(finalDestinationPath))
+        {
+            m_errorFlag = true;
+            WriteToLog("Failed to create the destination directory: " + finalDestinationPath);
+            wxMessageBox("Failed to create the destination directory!", "Error", wxOK | wxICON_ERROR);
+            return;
+        }
+
+        // Iterate over all files and subdirectories in the source directory
+        wxString fileName;
+        bool moreFiles = dir.GetFirst(&fileName, "", wxDIR_FILES | wxDIR_DIRS);
+
+        while (moreFiles)
+        {
+            wxString fullSourcePath = sourcePath2 + fileName;
+            wxString fullDestPath = finalDestinationPath + "\\" + fileName;
+
+            if (wxDir::Exists(fullSourcePath)) {
+                // If it's a directory, recursively copy the folder
+                FolderMover(fullSourcePath, finalDestinationPath);
+            }
+            else {
+                // If it's a file, copy the file
+                if (!wxCopyFile(fullSourcePath, fullDestPath)) {
+                    m_errorFlag = true;
+                    WriteToLog("Failed to copy file: " + fullSourcePath);
+                    wxMessageBox("Failed to copy file: " + fullSourcePath, "Error", wxOK | wxICON_ERROR);
+                    return;
+                }
+            }
+
+            moreFiles = dir.GetNext(&fileName); // Get the next file/subfolder
+        }
+    }
+    else
+    {
+
+        // Copy the file directly
+        if (!wxCopyFile(sourcePath, finalDestinationPath))
+        {
+            m_errorFlag = true;
+            WriteToLog("Failed to copy the file: " + sourcePath);
+            wxMessageBox("Failed to copy the file!", "Error", wxOK | wxICON_ERROR);
+        }
+    }
+}
+
 
 // Create a folder
 void cMain::CreateFolder(const wxString& folderPath)
@@ -571,7 +690,52 @@ void cMain::OnListBoxDoubleClick(wxCommandEvent& evt)
                     {
                         wxString destinationPath = destinationDirDialog.GetPath();
                         wxFileName destinationFile(destinationPath, fileName);
-                        m_listBox->SetString(selectedIndex, "Move: \"" + sourcePath + "\" \"" + destinationFile.GetFullPath() + "\"");
+                        m_listBox->SetString(selectedIndex, "Insert File: \"" + sourcePath + "\" \"" + destinationFile.GetFullPath() + "\"");
+                    }
+                }
+            }
+            else if (selectedOption == "Insert Folder")
+            {
+                // File dialog for selecting the source file
+                wxDirDialog sourceDirDialog(
+                    this,
+                    "Select the file to insert",
+                    resultsDir,  // Set the initial path to the results folder
+                    wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+
+                if (sourceDirDialog.ShowModal() == wxID_OK)
+                {
+                    wxString sourcePath = sourceDirDialog.GetPath();
+
+                    // Extract the file name from the source path
+                    wxFileName sourceFile(sourcePath);
+                    wxString fileName = sourceFile.GetFullName();  // This gives just the file name (including extension)
+
+                    if (sourcePath.StartsWith(resultsDir))
+                    {
+                        sourcePath = sourcePath.erase(0, resultsDir.length() - 1);
+                    }
+                    else
+                    {
+                        wxMessageBox("File paths outside of \"\\results\\\" folder may differ across machines", "WARNING", wxOK | wxICON_WARNING);
+                    }
+
+                    // File dialog for selecting the destination folder
+                    wxDirDialog destinationDirDialog(
+                        this,
+                        "Select where to insert folder",
+                        "",
+                        wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+
+                    if (destinationDirDialog.ShowModal() == wxID_OK)
+                    {
+                        wxString destinationPath = destinationDirDialog.GetPath();
+
+                        // Append the file name to the destination path
+                        wxFileName destinationFile(destinationPath, fileName);  // Combine folder and file name
+
+                        // Append the move command to the list box
+                        m_listBox->AppendString("Insert Folder: \"" + sourcePath + "\" \"" + destinationPath + "\"");
                     }
                 }
             }
@@ -997,7 +1161,7 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
         // File dialog for selecting the source file
         wxFileDialog sourceFileDialog(
             this,
-            "Select the file to insert",
+            "Select the folder to insert",
             resultsDir,  // Set the initial path to the results folder
             "",
             "All files (*.*)|*.*",
@@ -1035,7 +1199,52 @@ void cMain::OnButtonClicked(wxCommandEvent& evt)
                 wxFileName destinationFile(destinationPath, fileName);  // Combine folder and file name
 
                 // Append the move command to the list box
-                m_listBox->AppendString("Move: \"" + sourcePath + "\" \"" + destinationFile.GetFullPath() + "\"");
+                m_listBox->AppendString("Insert File: \"" + sourcePath + "\" \"" + destinationFile.GetFullPath() + "\"");
+            }
+        }
+    }
+    else if (selectedOption == "Insert Folder")
+    {
+        // File dialog for selecting the source file
+        wxDirDialog sourceDirDialog(
+            this,
+            "Select the file to insert",
+            resultsDir,  // Set the initial path to the results folder
+            wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+
+        if (sourceDirDialog.ShowModal() == wxID_OK)
+        {
+            wxString sourcePath = sourceDirDialog.GetPath();
+
+            // Extract the file name from the source path
+            wxFileName sourceFile(sourcePath);
+            wxString fileName = sourceFile.GetFullName();  // This gives just the file name (including extension)
+
+            if (sourcePath.StartsWith(resultsDir))
+            {
+                sourcePath = sourcePath.erase(0, resultsDir.length() - 1);
+            }
+            else
+            {
+                wxMessageBox("File paths outside of \"\\results\\\" folder may differ across machines", "WARNING", wxOK | wxICON_WARNING);
+            }
+
+            // File dialog for selecting the destination folder
+            wxDirDialog destinationDirDialog(
+                this,
+                "Select where to insert folder",
+                "",
+                wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+
+            if (destinationDirDialog.ShowModal() == wxID_OK)
+            {
+                wxString destinationPath = destinationDirDialog.GetPath();
+
+                // Append the file name to the destination path
+                wxFileName destinationFile(destinationPath, fileName);  // Combine folder and file name
+
+                // Append the move command to the list box
+                m_listBox->AppendString("Insert Folder: \"" + sourcePath + "\" \"" + destinationPath + "\"");
             }
         }
     }
@@ -1669,17 +1878,39 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
                 wxString exePath2 = item.Mid(10).Trim();
                 if (exePath2.substr(0, 1) == "\\") {  //Check if a partial path
                     exePath2 = resultsDir + exePath2;
-                    OutputDebugString(exePath2);
                 }
                 wxString logMessage = wxString::Format("Performing operation: %d, Run .exe for path: %s", i, exePath2);
                 WriteToLog(logMessage);
                 RunExe(exePath2);  // Call the function to run the executable
                 WriteToLog("Successfully ran .exe");
             }
-            else if (item.StartsWith("Move: "))
+            else if (item.StartsWith("Insert File: "))
             {
-                // Step 1: Remove "Move: " part (6 characters)
-                item = item.Mid(7);
+                // Step 1: Remove "Insert File: " part (14 characters)
+                item = item.Mid(14);
+
+                wxString logMessage = wxString::Format("Performing operation: %d, Move", i);
+                WriteToLog(logMessage);
+
+                // Step 2: Extract the first path
+                wxString first_path = item.BeforeFirst('\"');  // Extract everything before the first quote
+
+                // Step 3: Extract the second path
+                wxString second_path = item.Mid(first_path.Len() + 3);  // Skip past the first quote and path
+
+                second_path = second_path.BeforeFirst('\"');  // Extract everything before the next quote
+
+                if (first_path.substr(0, 1) == "\\") {  //Check if a partial path
+                    first_path = resultsDir + first_path;
+                }
+
+                FileMover(first_path, second_path);
+                WriteToLog("Successfully moved files");
+            }
+            else if (item.StartsWith("Insert Folder: "))
+            {
+                // Step 1: Remove "Insert Folder: " part (16 characters)
+                item = item.Mid(16);
 
                 wxString logMessage = wxString::Format("Performing operation: %d, Move", i);
                 WriteToLog(logMessage);
@@ -1697,7 +1928,7 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
                 }
                 OutputDebugString(first_path + "\n" + second_path + "\n");
 
-                FileMover(first_path, second_path);
+                FolderMover(first_path, second_path);
                 WriteToLog("Successfully moved files");
             }
             else if (item.StartsWith("Create Folder: "))
@@ -2033,9 +2264,9 @@ void cMain::OnRunScriptClicked(wxCommandEvent& evt)
             wxString exePath = item.Mid(10);  // Extract the path after "Run .exe: "
             scriptFile << "\"" << exePath.ToStdString() << "\"" << std::endl;
         }
-        else if (item.StartsWith("Move: "))
+        else if (item.StartsWith("Insert File: "))
         {
-            wxString moveCommand = item.Mid(6).Trim();  // Extract the move command after "Move: "
+            wxString moveCommand = item.Mid(6).Trim();  // Extract the move command after "Insert File: "
             scriptFile << "move " << moveCommand.ToStdString() << std::endl;
         }
         else if (item.StartsWith("Create Folder: "))

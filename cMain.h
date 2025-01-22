@@ -47,6 +47,8 @@ public:
 	// Utility functions for actions
 	void RunExe(const wxString& exePath);
 	void FileMover(const wxString& sourcePath, const wxString& destinationPath);
+	void FolderMover(const wxString& sourcePath, const wxString& destinationPath);
+	bool DeleteFolderRecursively(const wxString& folderPath);
 	void CreateFolder(const wxString& folderPath);
 	void CreateFiles(const wxString& filePath);
 	void SetEV(const wxString& varName, const wxString& varValue, bool append);

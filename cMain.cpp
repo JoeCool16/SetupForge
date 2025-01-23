@@ -11,6 +11,7 @@
 #include <Windows.h>
 #include <wx/dir.h>
 #include <fstream>
+#include "resource.h"
 
 wxBEGIN_EVENT_TABLE(cMain, wxFrame)
 	EVT_BUTTON(1001, OnButtonClicked)
@@ -23,9 +24,10 @@ wxEND_EVENT_TABLE()
 
 cMain::cMain() : wxFrame(nullptr, wxID_ANY, "Setup Forge", wxPoint(30, 30), wxSize(800, 600))
 {
-    wxIcon appIcon;
-    appIcon.LoadFile("app_icon.ico", wxBITMAP_TYPE_ICO);
-    SetIcon(appIcon);
+    //wxIcon appIcon;
+    //appIcon.LoadFile("app_icon.ico", wxBITMAP_TYPE_ICO);
+    //SetIcon(appIcon);
+    SetIcon(wxICON(IDI_ICON1));
 
     // Main Vertical Box Sizer
     wxBoxSizer* vbox = new wxBoxSizer(wxVERTICAL);
